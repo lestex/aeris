@@ -1,0 +1,22 @@
+#!/bin/bash
+# Inject ks/install.ks into a stock Fedora ISO. Needs `lorax` (Linux only).
+#
+#   ./bin/make-iso ~/Downloads/Fedora-Everything-netinst-x86_64-42-1.1.iso
+#
+# On macOS there is no mkksiso — use the OEMDRV stick route in the README
+# for the first install, then build ISOs from the installed machine.
+set -euo pipefail
+
+SRC=${1:?usage: make-iso <fedora-everything-netinst.iso>}
+[[ -f $SRC ]] || { echo "not a file: $SRC" >&2; exit 1; }
+
+ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+OUT="$ROOT/out/aerisos.iso"
+
+command -v mkksiso >/dev/null || { echo "mkksiso not found — dnf install lorax" >&2; exit 1; }
+
+mkdir -p "$ROOT/out"
+rm -f "$OUT"
+mkksiso --ks "$ROOT/ks/install.ks" "$SRC" "$OUT"
+
+echo "→ $OUT"

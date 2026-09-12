@@ -1,0 +1,13 @@
+# CLI base. Installed with weak deps off.
+bat
+btop
+eza
+fd-find
+fzf
+git
+jq
+openssl
+ripgrep
+tmux
+unzip
+zoxide

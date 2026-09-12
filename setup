@@ -1,0 +1,47 @@
+#!/bin/bash
+# AerisOS — idempotent system wiring. Safe to run as often as you like;
+# re-running it is how you apply changes, which is why there is no
+# migration system here.
+#
+#   sudo ./setup            run every step
+#   sudo ./setup 20 40      run only steps whose number matches
+
+set -euo pipefail
+
+[[ $EUID -eq 0 ]] || exec sudo -E "$0" "$@"
+
+AERIS_ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+cd "$AERIS_ROOT"
+
+TARGET_USER=${SUDO_USER:-}
+if [[ -z $TARGET_USER ]]; then
+  echo "Run this with sudo from your own account, not as root directly." >&2
+  exit 1
+fi
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+export AERIS_ROOT TARGET_USER TARGET_HOME
+
+steps=()
+if (( $# > 0 )); then
+  for want in "$@"; do
+    for f in setup.d/"$want"-*.sh; do
+      [[ -f $f ]] && steps+=("$f")
+    done
+  done
+else
+  for f in setup.d/*.sh; do
+    [[ -f $f ]] && steps+=("$f")
+  done
+fi
+
+if (( ${#steps[@]} == 0 )); then
+  echo "No matching steps." >&2
+  exit 1
+fi
+
+for step in "${steps[@]}"; do
+  printf '\n\033[1;34m──\033[0m %s\n' "${step#setup.d/}"
+  bash "$step"
+done
+
+printf '\n\033[1;32m✓\033[0m AerisOS setup complete.\n'

@@ -1,0 +1,27 @@
+# Wayland + Hyprland + Quickshell stack.
+hyprland
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpolkitagent
+
+quickshell
+# Quickshell's optional Qt deps: SVG, WEBP, media, blur effects
+qt6-qtsvg
+qt6-qtimageformats
+qt6-qtmultimedia
+qt6-qt5compat
+
+foot
+wl-clipboard
+grim
+slurp
+brightnessctl
+playerctl
+
+pipewire
+wireplumber
+pipewire-pulseaudio
+
+jetbrains-mono-fonts
+google-noto-sans-fonts
+google-noto-emoji-fonts
