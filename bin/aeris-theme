@@ -165,7 +165,11 @@ reload() {
   fi
 
   # alacritty needs nothing: live_config_reload defaults to true and it
-  # follows imported files.
+  # follows imported files. Say so rather than staying silent, so an
+  # unchanged window is never ambiguous.
+  if pgrep -x alacritty >/dev/null 2>&1; then
+    echo "  alacritty reloads itself"
+  fi
 
   # foot and ghostty cannot be reloaded in place. foot has no reload signal at
   # all — SIGUSR1/SIGUSR2 switch between the [colors-dark] and [colors-light]

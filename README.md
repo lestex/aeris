@@ -184,6 +184,11 @@ the settings twice makes it load the same `config-file` twice and report
 *"cycle detected"*. If a future build stops reading `config`, rename rather
 than adding a second copy.
 
+**The default terminal is kitty**, bound to `Alt/Super+Return`. Of the four,
+only kitty and alacritty pick up a theme without opening a new window, and
+kitty's path (`SIGUSR1`) is the one `aeris-theme` can drive. Change `$terminal`
+in `dotfiles/hypr/hyprland.conf` if you would rather have foot back.
+
 **foot does not reload.** It has no reload signal: `SIGUSR1`/`SIGUSR2` switch
 between the `[colors-dark]` and `[colors-light]` sections of the already-loaded
 config rather than re-reading the file. Open a new window after switching
