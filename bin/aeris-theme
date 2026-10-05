@@ -73,7 +73,7 @@ cmd_current() {
 
 # colors.toml is flat `key = "value"` with comments. A real TOML parser would
 # be overkill, but two things make the naive version wrong: every value starts
-# with "#", so stripping comments by pattern eats the colours, and grep -P is
+# with "#", so stripping comments by pattern eats the colors, and grep -P is
 # GNU-only. Pull the quoted value out positionally instead.
 read_colors() {
   awk '
@@ -230,7 +230,7 @@ reload() {
     hyprctl reload >/dev/null && echo "  hyprland reloaded"
   fi
 
-  # Colours in every running terminal, whatever it is.
+  # Colors in every running terminal, whatever it is.
   apply_osc
 
   # kitty additionally re-reads its config on SIGUSR1, which picks up the

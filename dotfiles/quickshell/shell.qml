@@ -1,8 +1,8 @@
 //
 // AerisOS bar.
 //
-// Layout follows Omarchy's: menu and workspaces left, clock centre, active
-// window right. Colours come from ~/.local/state/aerisos/current/colors.json,
+// Layout follows Omarchy's: menu and workspaces left, clock center, active
+// window right. Colors come from ~/.local/state/aerisos/current/colors.json,
 // written by `aeris-theme set`; FileView watches it so a theme switch
 // repaints without a restart.
 //
@@ -150,7 +150,7 @@ ShellRoot {
       }
     }
 
-    // --- centre: clock ------------------------------------------------------
+    // --- center: clock ------------------------------------------------------
 
     Text {
       id: clock

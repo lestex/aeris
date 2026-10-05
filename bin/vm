@@ -190,7 +190,7 @@ cmd_sync() {
   # ~/.config/quickshell are symlinks into this tree, and removing it out
   # from under a running Quickshell breaks its config watch — it keeps
   # serving the old shell.qml and no amount of editing changes anything.
-  # --clean restores the delete-first behaviour when stale files matter.
+  # --clean restores the delete-first behavior when stale files matter.
   scp -q -r -P "$SSH_PORT" "${SSH_OPTS[@]}" "$stage/aerisos" "$USER_NAME@localhost:aerisos-incoming"
   if (( CLEAN )); then
     ssh_vm 'rm -rf ~/aerisos && mv ~/aerisos-incoming ~/aerisos'

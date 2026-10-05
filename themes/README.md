@@ -4,9 +4,9 @@ Each theme is a single `colors.toml`. The palettes here are taken from
 [Omarchy](https://github.com/omacom/omarchy), which is MIT licensed — see
 `LICENSE-omarchy` beside this file.
 
-Only the colour data was copied. Omarchy's theme *backgrounds* were not: those
+Only the color data was copied. Omarchy's theme *backgrounds* were not: those
 are images with their own provenance, and are not covered by simply carrying
-the repository's licence.
+the repository's license.
 
 ## The key set
 

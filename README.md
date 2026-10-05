@@ -146,7 +146,7 @@ Remove, Update, System, About — minus Learn, which pointed at their manual:
 | | |
 | --- | --- |
 | Style | Theme (all 22), Font |
-| Trigger | Capture (region/screen/window), Clipboard, Colour picker |
+| Trigger | Capture (region/screen/window), Clipboard, Color picker |
 | Setup | Config, Keybindings, Network |
 | Install / Remove | type a package name; runs dnf in a terminal |
 | Update | System packages, Snapshots |
@@ -168,14 +168,14 @@ same job in a page of shell because it only has to serve one person.
 
 ## The bar
 
-Quickshell, laid out like Omarchy's: menu and workspaces left, clock centre,
+Quickshell, laid out like Omarchy's: menu and workspaces left, clock center,
 active window right.
 
 | | |
 | --- | --- |
 | **AerisOS** (left) | click opens `aeris-menu` |
 | Workspaces | click to switch; focused filled with the accent, urgent in red |
-| Clock | centre |
+| Clock | center |
 | Active window | right, elided, capped at half the bar |
 
 `dotfiles/quickshell/shell.qml`, ~190 lines. Omarchy's bar is 2,076 lines of
@@ -190,9 +190,9 @@ takes the same strings `hyprctl dispatch` does.
 
 ## Theming
 
-Palettes are Omarchy's, taken as data under its MIT licence (see
+Palettes are Omarchy's, taken as data under its MIT license (see
 `themes/LICENSE-omarchy`). The renderer is ours and much smaller: Omarchy's is
-~600 lines because it carries gradients, colour mixing, legacy `colorN` aliases
+~600 lines because it carries gradients, color mixing, legacy `colorN` aliases
 and derived shades. Strip those and the idea is one sed script.
 
 ```
