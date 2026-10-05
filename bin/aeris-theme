@@ -42,6 +42,8 @@ CURRENT="$STATE/current"
 
 die() { echo "aeris-theme: $*" >&2; exit 1; }
 
+declare -A COLORS=()
+
 theme_dir() {
   local name=$1
   [[ $name == */* || $name == .* ]] && die "invalid theme name: $name"
@@ -117,6 +119,7 @@ cmd_set() {
 
   while IFS=$'\t' read -r key value; do
     [[ -n $key ]] || continue
+    COLORS[$key]=$value
     printf 's|{{ %s }}|%s|g\n'       "$key" "$value"    >>"$script"
     printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}" >>"$script"
     if [[ $value =~ ^#[0-9A-Fa-f]{6}$ ]]; then
@@ -153,42 +156,85 @@ cmd_set() {
   reload
 }
 
+# OSC escape sequences repaint a *running* terminal's palette. This is the
+# only way to reach foot and ghostty, neither of which can reload its config,
+# and it works in every terminal that speaks OSC — which all four do.
+#
+#   10 foreground   11 background   12 cursor
+#   17 selection bg 19 selection fg  4;N ANSI slot N
+osc_sequence() {
+  local seq="" code key i
+  local -a named=(
+    10 foreground
+    11 background
+    12 bright_foreground
+    17 selection
+    19 bright_foreground
+  )
+
+  for ((i = 0; i < ${#named[@]}; i += 2)); do
+    code=${named[i]}
+    key=${named[i + 1]}
+    [[ -n ${COLORS[$key]:-} ]] || continue
+    seq+=$'\033]'"$code;${COLORS[$key]}"$'\007'
+  done
+
+  # ANSI 0-15, the same mapping the terminal templates use.
+  local -a ansi=(
+    background red green yellow blue magenta cyan foreground
+    muted bright_red bright_green bright_yellow bright_blue
+    bright_magenta bright_cyan bright_foreground
+  )
+  for i in "${!ansi[@]}"; do
+    key=${ansi[i]}
+    [[ -n ${COLORS[$key]:-} ]] || continue
+    seq+=$'\033]4;'"$i;${COLORS[$key]}"$'\007'
+  done
+
+  printf '%s' "$seq"
+}
+
+# Write the sequence to the pts of every shell running inside a terminal. The
+# terminal process itself does not own the pts — its child does — so walk one
+# level down and read where that child's stdout points.
+apply_osc() {
+  local seq term pid child tty count=0
+
+  seq=$(osc_sequence)
+  [[ -n $seq ]] || return 0
+
+  for term in foot ghostty kitty alacritty; do
+    for pid in $(pgrep -x "$term" 2>/dev/null || true); do
+      for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+        tty=$(readlink "/proc/$child/fd/1" 2>/dev/null || true)
+        if [[ $tty == /dev/pts/* ]]; then
+          if printf '%s' "$seq" >"$tty" 2>/dev/null; then
+            count=$((count + 1))
+          fi
+        fi
+      done
+    done
+  done
+
+  if (( count > 0 )); then
+    echo "  repainted $count running terminal(s)"
+  fi
+}
+
 reload() {
   # Hyprland sources the generated file, so a reload is enough.
   if command -v hyprctl >/dev/null && [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
     hyprctl reload >/dev/null && echo "  hyprland reloaded"
   fi
 
-  # kitty reloads its config on SIGUSR1.
+  # Colours in every running terminal, whatever it is.
+  apply_osc
+
+  # kitty additionally re-reads its config on SIGUSR1, which picks up the
+  # things OSC cannot carry — font, padding, window settings.
   if pgrep -x kitty >/dev/null 2>&1; then
-    pkill -USR1 -x kitty && echo "  kitty reloaded"
+    pkill -USR1 -x kitty && echo "  kitty config reloaded"
   fi
-
-  # alacritty needs nothing: live_config_reload defaults to true and it
-  # follows imported files. Say so rather than staying silent, so an
-  # unchanged window is never ambiguous.
-  if pgrep -x alacritty >/dev/null 2>&1; then
-    echo "  alacritty reloads itself"
-  fi
-
-  # foot and ghostty cannot be reloaded in place. foot has no reload signal at
-  # all — SIGUSR1/SIGUSR2 switch between the [colors-dark] and [colors-light]
-  # sections of the config it already loaded rather than re-reading the file.
-  # Running windows keep their colours; new ones pick up the theme.
-  # Note the full `if`: under `set -e`, a bare `(( n > 0 )) && echo` returns 1
-  # when the test is false, and as the last command in the loop that aborts
-  # the script — intermittently, depending on what happens to be running.
-  local term running
-  for term in foot ghostty; do
-    # pgrep exits 1 with no match, and `pipefail` would carry that out of a
-    # `| wc -l` pipeline straight into `set -e`. Count with -c and swallow
-    # the status instead of piping.
-    running=$(pgrep -cx "$term" 2>/dev/null || true)
-    running=${running:-0}
-    if (( running > 0 )); then
-      echo "  $running $term window(s) keep the old colours — open a new one"
-    fi
-  done
 
   # Quickshell watches its own config and the files it reads; nothing to do.
 }
