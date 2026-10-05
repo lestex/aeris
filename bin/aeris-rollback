@@ -87,6 +87,20 @@ cmd_rollback() {
     die "btrfs snapshot failed — original root restored, nothing changed"
   fi
 
+  # This tool lives on the root subvolume, so rolling back past its own
+  # installation deletes it — an escape hatch has to survive being used.
+  # Plant a copy in the restored root. bin_t because the restored tree's
+  # labels are computed for its own paths, not for $top/....
+  local self dest
+  self=$(readlink -f "${BASH_SOURCE[0]}")
+  dest="$top/$root_sub/usr/local/bin/aeris-rollback"
+  if mkdir -p "${dest%/*}" && cp -f "$self" "$dest"; then
+    chmod 0755 "$dest"
+    chcon -t bin_t "$dest" 2>/dev/null || true
+  else
+    echo "warning: could not place aeris-rollback in the restored root" >&2
+  fi
+
   # Nested subvolumes are not captured by a btrfs snapshot, so anything that
   # created one is absent from the restored root. Name them; they are the
   # blind spot in any snapshot-based rollback.

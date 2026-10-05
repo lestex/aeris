@@ -90,6 +90,18 @@ resolves to the restored content. The old root is kept as
 `root.rollback-<timestamp>`; delete it once the rolled-back system has proved
 itself.
 
+### The tool survives its own use
+
+`aeris-rollback` is installed to `/usr/local/bin`, which is on the root
+subvolume — so rolling back to a snapshot taken before it was installed would
+delete it. It therefore copies itself into the restored root before you
+reboot. If you ever do end up without it, the repo lives in `$HOME` on a
+separate subvolume that rollbacks do not touch:
+
+```
+sudo ~/aerisos/bin/aeris-rollback --prune
+```
+
 ### One limitation
 
 `/boot` is a separate partition and is **not** rolled back, while
