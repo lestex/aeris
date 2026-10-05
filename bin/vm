@@ -140,7 +140,13 @@ cmd_sync() {
   rsync -a --exclude=/out --exclude=/.git "$ROOT/" "$stage/aerisos/"
   ssh_vm 'rm -rf ~/aerisos'
   scp -q -r -P "$SSH_PORT" "${SSH_OPTS[@]}" "$stage/aerisos" "$USER_NAME@localhost:"
-  echo "synced to ~/aerisos — try: bin/vm ssh 'cd aerisos && sudo ./setup'"
+  # ~/aerisos in the guest is a copy, not a live mount, so say exactly what
+  # landed there — otherwise a stale guest copy looks like a broken script.
+  local rev dirty=""
+  rev=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  git -C "$ROOT" diff --quiet 2>/dev/null || dirty=" +uncommitted"
+  echo "synced $rev$dirty to ~/aerisos"
+  echo "try: bin/vm ssh 'cd aerisos && sudo ./setup 20'"
 }
 
 cmd_snapshot() {
