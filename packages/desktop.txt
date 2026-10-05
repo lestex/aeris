@@ -1,6 +1,6 @@
 # Shared Wayland bits. The compositor itself comes from
 # packages/compositor-$AERIS_COMPOSITOR.txt — see setup.d/40-desktop.sh.
-xdg-desktop-portal-xdg-desktop-portal-gtk
+xdg-desktop-portal-gtk
 
 # Gallium drivers (virtio-gpu, llvmpipe). A weak dependency, so
 # --exclude-weakdeps would otherwise leave the compositor with no renderer.

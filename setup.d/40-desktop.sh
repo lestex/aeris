@@ -10,14 +10,44 @@ compositor=${AERIS_COMPOSITOR:-hyprland}
 list="$AERIS_ROOT/packages/compositor-$compositor.txt"
 [[ -f $list ]] || { echo "no package list for compositor '$compositor'" >&2; exit 1; }
 
+echo "  compositor: $compositor"
+
 mapfile -t pkgs < <(
-  grep -hvE '^\s*(#|$)' \
+  grep -hvE '^[[:space:]]*(#|$)' \
     "$AERIS_ROOT/packages/base.txt" \
     "$AERIS_ROOT/packages/desktop.txt" \
-    "$list" | sort -u
+    "$list" | tr -d '[:space:]' | sort -u
+)
+(( ${#pkgs[@]} )) || { echo "no packages listed" >&2; exit 1; }
+
+# Resolve names against the enabled repos first. A typo, or a package that
+# simply is not built for this architecture, is then reported as a list up
+# front instead of surfacing partway through a long download.
+mapfile -t missing < <(
+  comm -23 \
+    <(printf '%s\n' "${pkgs[@]}") \
+    <(dnf -q repoquery --qf '%{name}' "${pkgs[@]}" 2>/dev/null | sort -u)
+)
+if (( ${#missing[@]} )); then
+  echo "not available for $(uname -m) in the enabled repos:" >&2
+  printf '  %s\n' "${missing[@]}" >&2
+  echo "fix packages/*.txt, or enable a repo that carries them (setup.d/10-repos.sh)" >&2
+  exit 1
+fi
+
+# Install only what is absent, so re-running this step is fast and quiet
+# rather than asking dnf to re-resolve the whole list every time.
+mapfile -t want < <(
+  comm -23 \
+    <(printf '%s\n' "${pkgs[@]}") \
+    <(rpm -qa --qf '%{NAME}\n' | sort -u)
 )
 
-echo "  compositor: $compositor"
-dnf -y install --setopt=install_weak_deps=False "${pkgs[@]}"
+if (( ${#want[@]} )); then
+  echo "  installing ${#want[@]} of ${#pkgs[@]} packages"
+  dnf -y install --setopt=install_weak_deps=False "${want[@]}"
+else
+  echo "  all ${#pkgs[@]} packages already present"
+fi
 
 systemctl --global enable pipewire.socket wireplumber.service
