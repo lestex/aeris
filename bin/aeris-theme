@@ -1,0 +1,162 @@
+#!/bin/bash
+# aeris-theme — render themed/*.tpl against a theme's colors.toml.
+#
+#   aeris-theme list            themes available
+#   aeris-theme current         the active theme
+#   aeris-theme set <name>      render, apply, reload
+#
+# Rendered files land in ~/.local/state/aerisos/current/. Nothing writes into
+# the repo, and nothing rewrites your configs: each config *includes* the
+# generated file, so switching themes is a re-render plus a reload.
+#
+# Template syntax, a trimmed version of Omarchy's:
+#   {{ key }}        "#1a1b26"
+#   {{ key_strip }}  "1a1b26"    — for configs that reject the leading #
+#   {{ key_rgb }}    "26,27,38"
+set -euo pipefail
+
+# Installed to /usr/local/bin, this script no longer sits beside themes/ and
+# themed/, so an explicit AERIS_ROOT wins; the path-derived value is the
+# fallback for running it straight out of the repo.
+if [[ -n ${AERIS_ROOT:-} && -d ${AERIS_ROOT:-}/themes ]]; then
+  : # provided by the caller
+else
+  AERIS_ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+fi
+[[ -d $AERIS_ROOT/themes ]] || { echo "aeris-theme: no themes/ under $AERIS_ROOT; set AERIS_ROOT" >&2; exit 1; }
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/aerisos"
+CURRENT="$STATE/current"
+
+die() { echo "aeris-theme: $*" >&2; exit 1; }
+
+theme_dir() {
+  local name=$1
+  [[ $name == */* || $name == .* ]] && die "invalid theme name: $name"
+  echo "$AERIS_ROOT/themes/$name"
+}
+
+cmd_list() {
+  local d name
+  for d in "$AERIS_ROOT"/themes/*/; do
+    name=$(basename "$d")
+    [[ -f $d/colors.toml ]] || continue
+    if [[ $name == "$(cmd_current 2>/dev/null)" ]]; then
+      echo "* $name"
+    else
+      echo "  $name"
+    fi
+  done
+}
+
+cmd_current() {
+  [[ -f $CURRENT/theme ]] || die "no theme set"
+  cat "$CURRENT/theme"
+}
+
+# colors.toml is flat `key = "value"` with comments. A real TOML parser would
+# be overkill, but two things make the naive version wrong: every value starts
+# with "#", so stripping comments by pattern eats the colours, and grep -P is
+# GNU-only. Pull the quoted value out positionally instead.
+read_colors() {
+  awk '
+    /^[[:space:]]*[A-Za-z0-9_]+[[:space:]]*=/ {
+      eq = index($0, "=")
+      key = substr($0, 1, eq - 1)
+      gsub(/[[:space:]]/, "", key)
+
+      rest = substr($0, eq + 1)
+      q1 = index(rest, "\"")
+      if (q1 > 0) {
+        rest = substr(rest, q1 + 1)
+        q2 = index(rest, "\"")
+        if (q2 < 1) next
+        val = substr(rest, 1, q2 - 1)
+      } else {
+        val = rest
+        sub(/#.*/, "", val)
+        gsub(/[[:space:]]/, "", val)
+      }
+
+      if (key != "" && val != "") printf "%s\t%s\n", key, val
+    }
+  ' "$1"
+}
+
+hex_to_rgb() {
+  local hex=${1#\#}
+  printf '%d,%d,%d' "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+cmd_set() {
+  local name=${1:-}
+  [[ -n $name ]] || die "usage: aeris-theme set <name>"
+
+  local dir colors
+  dir=$(theme_dir "$name")
+  colors="$dir/colors.toml"
+  [[ -f $colors ]] || die "no such theme: $name"
+
+  mkdir -p "$CURRENT"
+
+  local script key value
+  script=$(mktemp)
+  trap 'rm -f "$script"' RETURN
+
+  while IFS=$'\t' read -r key value; do
+    [[ -n $key ]] || continue
+    printf 's|{{ %s }}|%s|g\n'       "$key" "$value"    >>"$script"
+    printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}" >>"$script"
+    if [[ $value =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+      printf 's|{{ %s_rgb }}|%s|g\n' "$key" "$(hex_to_rgb "$value")" >>"$script"
+    fi
+  done < <(read_colors "$colors")
+
+  local tpl out rendered=0
+  for tpl in "$AERIS_ROOT"/themed/*.tpl; do
+    [[ -f $tpl ]] || continue
+    out="$CURRENT/$(basename "$tpl" .tpl)"
+    sed -f "$script" "$tpl" >"$out"
+    rendered=$((rendered + 1))
+  done
+
+  # A template referencing a key the palette lacks would otherwise ship a
+  # literal {{ ... }} into a config file, where it fails far from its cause.
+  local leftovers
+  leftovers=$(grep -l '{{' "$CURRENT"/* 2>/dev/null || true)
+  if [[ -n $leftovers ]]; then
+    echo "unsubstituted placeholders remain — the palette is missing keys:" >&2
+    grep -ho '{{[^}]*}}' $leftovers | sort -u >&2
+    die "refusing to apply $name"
+  fi
+
+  # btop loads themes by name from its own directory rather than by path.
+  if [[ -f $CURRENT/btop.theme ]]; then
+    install -Dm0644 "$CURRENT/btop.theme" "${XDG_CONFIG_HOME:-$HOME/.config}/btop/themes/aeris.theme"
+  fi
+
+  echo "$name" >"$CURRENT/theme"
+  echo "rendered $rendered file(s) for $name"
+
+  reload
+}
+
+reload() {
+  # Hyprland sources the generated file, so a reload is enough.
+  if command -v hyprctl >/dev/null && [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+    hyprctl reload >/dev/null && echo "  hyprland reloaded"
+  fi
+
+  # foot re-reads its config on SIGUSR1, per foot(1).
+  if pgrep -x foot >/dev/null 2>&1; then
+    pkill -USR1 -x foot && echo "  foot reloaded"
+  fi
+
+  # Quickshell watches its own config and the files it reads; nothing to do.
+}
+
+case ${1:-} in
+  list)    cmd_list ;;
+  current) cmd_current ;;
+  set)     shift; cmd_set "$@" ;;
+  *)       sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

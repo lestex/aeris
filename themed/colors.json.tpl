@@ -1,0 +1,20 @@
+{
+  "mode": "{{ mode }}",
+  "accent": "{{ accent }}",
+  "selection": "{{ selection }}",
+  "muted": "{{ muted }}",
+  "background": "{{ background }}",
+  "darkBackground": "{{ dark_background }}",
+  "darkerBackground": "{{ darker_background }}",
+  "lighterBackground": "{{ lighter_background }}",
+  "foreground": "{{ foreground }}",
+  "darkForeground": "{{ dark_foreground }}",
+  "lightForeground": "{{ light_foreground }}",
+  "brightForeground": "{{ bright_foreground }}",
+  "red": "{{ red }}",
+  "yellow": "{{ yellow }}",
+  "green": "{{ green }}",
+  "cyan": "{{ cyan }}",
+  "blue": "{{ blue }}",
+  "magenta": "{{ magenta }}"
+}

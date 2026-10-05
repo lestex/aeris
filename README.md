@@ -125,6 +125,43 @@ Keep the package list honest:
 dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 ```
 
+## Theming
+
+Palettes are Omarchy's, taken as data under its MIT licence (see
+`themes/LICENSE-omarchy`). The renderer is ours and much smaller: Omarchy's is
+~600 lines because it carries gradients, colour mixing, legacy `colorN` aliases
+and derived shades. Strip those and the idea is one sed script.
+
+```
+aeris-theme list
+aeris-theme set tokyo-night
+aeris-theme current
+```
+
+`themed/*.tpl` are rendered into `~/.local/state/aerisos/current/`, and each
+config *includes* its generated file rather than being rewritten:
+
+| Config | How it picks the theme up |
+| --- | --- |
+| `hypr/hyprland.conf` | `source =` the generated file, last so it wins |
+| `foot/foot.ini` | `include=` as the first line |
+| btop | rendered theme copied to `~/.config/btop/themes/aeris.theme` |
+
+Template syntax, a trimmed version of Omarchy's:
+
+```
+{{ accent }}        #7aa2f7
+{{ accent_strip }}  7aa2f7      for configs that reject the leading #
+{{ accent_rgb }}    122,162,247
+```
+
+A template referencing a key some palette lacks is caught at render time —
+`aeris-theme` refuses to apply rather than writing a literal `{{ ... }}` into a
+config, where it would fail far from its cause. Use only the keys listed in
+`themes/README.md`; all 22 palettes define them.
+
+For btop, set `color_theme = "aeris"` in its config once.
+
 ## Phases
 
 - [ ] **1. Kickstart that boots** — unattended, encrypted, correct subvolumes, no desktop
