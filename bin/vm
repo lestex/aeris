@@ -227,9 +227,13 @@ cmd_backgrounds() {
   #
   # Plain ssh rather than ssh_vm here — that passes -t for an interactive tty,
   # which would corrupt a binary stream.
-  ( cd "$ROOT/themes" && tar -cf - */backgrounds ) \
+  # Into ~/.local/share/aerisos, which is where aeris-background looks and
+  # which `setup 70` does not wipe. COPYFILE_DISABLE and the ._* exclude stop
+  # macOS tar emitting AppleDouble sidecars that the guest would unpack as
+  # junk files sitting next to every image.
+  ( cd "$ROOT/themes" && COPYFILE_DISABLE=1 tar --exclude='._*' -cf - */backgrounds ) \
     | ssh -p "$SSH_PORT" "${SSH_OPTS[@]}" "$USER_NAME@localhost" \
-        'mkdir -p ~/aerisos/themes && tar -C ~/aerisos/themes -xf -'
+        'd=${XDG_DATA_HOME:-$HOME/.local/share}/aerisos; mkdir -p "$d" && tar -C "$d" -xmf -'
 
   echo "done"
 }

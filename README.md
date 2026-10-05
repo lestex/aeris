@@ -218,6 +218,11 @@ bin/aeris-backgrounds-import [path-to-omarchy]    # default ../omarchy/omarchy
 bin/vm backgrounds                                 # push them to the VM
 ```
 
+On the machine they live in `~/.local/share/aerisos/<theme>/backgrounds/`,
+not beside the palettes in `/usr/local/share/aerisos`. `setup 70` replaces
+that tree wholesale every run, and 52 MB of wallpaper has no business being
+deleted and recopied on a schedule set by template edits.
+
 92 images across all 22 themes, ~52 MB.
 
 **They are not tracked by git**, on purpose. Committing wallpapers is what

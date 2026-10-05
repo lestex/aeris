@@ -8,9 +8,15 @@
 #   aeris-background current          print the active path
 #
 # Images are looked for in, in order:
-#   themes/<active-theme>/backgrounds/   per-theme, like Omarchy's
-#   ~/Pictures/backgrounds/              yours
-#   <repo>/backgrounds/                  shipped with AerisOS
+#   ~/.local/share/aerisos/<theme>/backgrounds/   per-theme, imported
+#   ~/Pictures/backgrounds/                       yours
+#   <data root>/themes/<theme>/backgrounds/       from a checkout
+#   <data root>/backgrounds/                      shipped
+#
+# The per-theme directory lives under XDG_DATA_HOME rather than beside the
+# palettes in /usr/local/share, because `setup 70` replaces that tree
+# wholesale on every run — 52 MB of wallpaper would be deleted and recopied
+# each time, when it changes on a completely different schedule.
 #
 # The choice is written as plain text to ~/.local/state/aerisos/current/
 # background. Omarchy uses a symlink there, which works because their shell
@@ -38,10 +44,15 @@ resolve_root() {
 }
 AERIS_ROOT=$(resolve_root) || die "cannot find the AerisOS data; set AERIS_ROOT"
 
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/aerisos"
+
 search_dirs() {
   local theme
   theme=$(cat "$CURRENT/theme" 2>/dev/null || true)
-  [[ -n $theme ]] && printf '%s\n' "$AERIS_ROOT/themes/$theme/backgrounds"
+  if [[ -n $theme ]]; then
+    printf '%s\n' "$DATA/$theme/backgrounds"
+    printf '%s\n' "$AERIS_ROOT/themes/$theme/backgrounds"
+  fi
   printf '%s\n' "$HOME/Pictures/backgrounds"
   printf '%s\n' "$AERIS_ROOT/backgrounds"
 }
