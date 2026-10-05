@@ -12,9 +12,32 @@ set -euo pipefail
 dnf -y install --setopt=install_weak_deps=False \
   snapper libdnf5-plugin-actions btrfs-progs
 
-# Create the root config only if it is absent.
-if ! snapper -c root list &>/dev/null; then
+# `snapper create-config` refuses to run when /.snapshots already exists, and
+# the kickstart mounts a dedicated subvolume there. So stand our mount aside,
+# let snapper create its own, then swap ours back in.
+#
+# The separate subvolume is worth this dance: it lives outside the root
+# subvolume, so `snapper rollback` — which makes a *different* subvolume the
+# default root — leaves the snapshot history untouched. A /.snapshots nested
+# inside root would travel with whichever root you rolled onto.
+if [[ ! -f /etc/snapper/configs/root ]]; then
+  remount=0
+  if mountpoint -q /.snapshots; then
+    umount /.snapshots
+    remount=1
+  fi
+  rmdir /.snapshots 2>/dev/null || true
+
   snapper -c root create-config /
+
+  # snapper just made /.snapshots its own subvolume; drop it and restore the
+  # fstab-managed one.
+  if btrfs subvolume show /.snapshots &>/dev/null; then
+    btrfs subvolume delete /.snapshots
+  fi
+  mkdir -p /.snapshots
+  (( remount )) && mount /.snapshots
+  chmod 0750 /.snapshots
 fi
 
 # Transaction-driven, not clock-driven: timeline snapshots bury the
@@ -38,3 +61,7 @@ if [[ $(uname -m) == "x86_64" ]]; then
 else
   echo "  skipping grub-btrfs: no $(uname -m) build — boot-menu entries UNVERIFIED on this host"
 fi
+
+# Fail loudly rather than leaving a half-wired system that looks fine.
+snapper -c root get-config >/dev/null
+echo "  snapper root config present; /.snapshots $(mountpoint -q /.snapshots && echo mounted || echo 'NOT mounted')"

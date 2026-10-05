@@ -18,6 +18,14 @@ DISK="$OUT/aeris.qcow2"
 VARS="$OUT/vars.fd"
 OEMDRV="$OUT/oemdrv.dmg"
 SSH_PORT=2222
+SSH_OPTS=(
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o LogLevel=ERROR
+  -o ControlMaster=auto
+  -o ControlPath="${TMPDIR:-/tmp}/aeris-vm-%r@%h:%p"
+  -o ControlPersist=60
+)
 USER_NAME=$(awk '/^user /{for (i=1; i<=NF; i++) if ($i ~ /^--name=/) print substr($i, 8)}' "$ROOT/ks/install.ks")
 
 command -v qemu-system-aarch64 >/dev/null || { echo "qemu not found — brew install qemu" >&2; exit 1; }
@@ -34,8 +42,7 @@ qemu() {
 }
 
 ssh_vm() {
-  ssh -t -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o LogLevel=ERROR "$USER_NAME@localhost" "$@"
+  ssh -t -p "$SSH_PORT" "${SSH_OPTS[@]}" "$USER_NAME@localhost" "$@"
 }
 
 # The real kickstart with VM values: virtio disk, test credentials, and a
@@ -46,6 +53,25 @@ make_ks() {
       -e 's/REPLACE_ME/testtest/' \
       -e 's/^bootloader --append="\([^"]*\)"/bootloader --append="\1 console=ttyAMA0"/' \
       "$ROOT/ks/install.ks" > "$OUT/ks.cfg"
+
+  local key
+  for key in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
+    [[ -f $key ]] || continue
+    cat >> "$OUT/ks.cfg" <<KSPOST
+
+%post
+install -d -m 0700 -o $USER_NAME -g $USER_NAME /home/$USER_NAME/.ssh
+cat > /home/$USER_NAME/.ssh/authorized_keys <<'AUTHKEY'
+$(< "$key")
+AUTHKEY
+chmod 0600 /home/$USER_NAME/.ssh/authorized_keys
+chown $USER_NAME:$USER_NAME /home/$USER_NAME/.ssh/authorized_keys
+command -v restorecon >/dev/null && restorecon -R /home/$USER_NAME/.ssh
+%end
+KSPOST
+    echo "injected $key for passwordless ssh" >&2
+    break
+  done
 }
 
 # A small FAT disk labelled OEMDRV holding ks.cfg — the same route as the
@@ -113,8 +139,7 @@ cmd_sync() {
   trap 'rm -rf "$stage"' RETURN
   rsync -a --exclude=/out --exclude=/.git "$ROOT/" "$stage/aerisos/"
   ssh_vm 'rm -rf ~/aerisos'
-  scp -q -r -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o LogLevel=ERROR "$stage/aerisos" "$USER_NAME@localhost:"
+  scp -q -r -P "$SSH_PORT" "${SSH_OPTS[@]}" "$stage/aerisos" "$USER_NAME@localhost:"
   echo "synced to ~/aerisos — try: bin/vm ssh 'cd aerisos && sudo ./setup'"
 }
 
