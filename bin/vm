@@ -5,6 +5,7 @@
 #                       wipe the VM disk, install unattended from ks/install.ks
 #   bin/vm boot         boot the installed VM (serial console in this terminal)
 #   bin/vm boot --gui   boot with a virtio-gpu display, for the desktop
+#                       resolution: AERIS_VM_RES=1920x1080 bin/vm boot --gui
 #   bin/vm sync         copy this working tree to ~/aerisos in the running VM
 #   bin/vm ssh [cmd]    ssh into the running VM
 #   bin/vm save | reset save the VM disk as "fresh" / roll back to it
@@ -21,6 +22,9 @@ OEMDRV="$OUT/oemdrv.dmg"
 SSH_PORT=2222
 GUI=0
 MEM=${AERIS_VM_MEM:-4096}
+# virtio-gpu defaults to a very small framebuffer, which gives a cramped
+# console and an equally cramped compositor. Override with AERIS_VM_RES.
+RES=${AERIS_VM_RES:-1600x900}
 SSH_OPTS=(
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
@@ -41,7 +45,7 @@ qemu() {
   local out=(-nographic)
   if (( GUI )); then
     out=(
-      -device virtio-gpu-pci
+      -device "virtio-gpu-pci,xres=${RES%x*},yres=${RES#*x}"
       -device qemu-xhci -device usb-kbd -device usb-tablet
       -display cocoa
       -serial mon:stdio
@@ -151,7 +155,7 @@ cmd_boot() {
     # There is no virgl on this host, so the guest renders with llvmpipe on
     # the CPU. Give it room, and more cores than the headless default needs.
     MEM=${AERIS_VM_MEM:-8192}
-    echo "graphical mode: log in on the QEMU window (tty1), not this serial console"
+    echo "graphical mode at $RES — log in on the QEMU window (tty1), not this serial console"
   fi
   qemu
 }
