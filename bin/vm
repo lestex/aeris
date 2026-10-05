@@ -8,6 +8,7 @@
 #                       resolution: AERIS_VM_RES=1920x1080 bin/vm boot --gui
 #   bin/vm sync         copy this working tree to ~/aerisos in the running VM
 #   bin/vm ssh [cmd]    ssh into the running VM
+#   bin/vm hyprctl ...  run hyprctl in the guest's Hyprland session
 #   bin/vm save | reset save the VM disk as "fresh" / roll back to it
 #
 # Quit the console with Ctrl-A then X. VM logins: user password "test",
@@ -160,6 +161,21 @@ cmd_boot() {
   qemu
 }
 
+# hyprctl needs HYPRLAND_INSTANCE_SIGNATURE, which an ssh session does not
+# inherit. It is discoverable: Hyprland makes a directory per instance under
+# $XDG_RUNTIME_DIR/hypr (older versions used /tmp/hypr). Being able to drive
+# the session from the host — reload the config, launch an app, query state —
+# is most of what makes iterating on the desktop bearable.
+cmd_hyprctl() {
+  local args
+  args=$(printf ' %q' "$@")
+  ssh_vm "export XDG_RUNTIME_DIR=/run/user/\$(id -u); \
+d=\$XDG_RUNTIME_DIR/hypr; [ -d \"\$d\" ] || d=/tmp/hypr; \
+sig=\$(ls -t \"\$d\" 2>/dev/null | head -1); \
+[ -n \"\$sig\" ] || { echo 'no running hyprland instance' >&2; exit 1; }; \
+HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl$args"
+}
+
 cmd_sync() {
   local stage
   stage=$(mktemp -d)
@@ -192,6 +208,7 @@ case ${1:-} in
   boot)       shift; cmd_boot "$@" ;;
   sync)       cmd_sync ;;
   ssh)        shift; ssh_vm "$@" ;;
+  hyprctl)    shift; cmd_hyprctl "$@" ;;
   save|reset) cmd_snapshot "$1" ;;
   *)          sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
