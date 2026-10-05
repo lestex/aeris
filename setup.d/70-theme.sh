@@ -1,15 +1,28 @@
 #!/bin/bash
-# Install the theme command and apply a theme, so the generated files exist.
+# Install the theme command and its data, then apply a theme so the generated
+# files exist.
 #
-# This has to run: dotfiles/hypr/hyprland.conf sources
-# ~/.local/state/aerisos/current/hyprland.conf, and Hyprland treats a missing
-# source as fatal. foot is more forgiving about a missing include, but the
-# colours would simply be absent.
+# This has to run before a Hyprland session starts: dotfiles/hypr/hyprland.conf
+# sources ~/.local/state/aerisos/current/hyprland.conf, and Hyprland treats a
+# missing source as fatal.
+#
+# themes/ and themed/ are copied rather than symlinked, so the command works
+# with no checkout present. While iterating on templates, point at the repo
+# instead:  AERIS_ROOT=~/aerisos aeris-theme set <name>
 set -euo pipefail
+
+share=/usr/local/share/aerisos
 
 install -Dm0755 "$AERIS_ROOT/bin/aeris-theme" /usr/local/bin/aeris-theme
 
-# Render as the user: everything lands under their ~/.local/state.
+rm -rf "$share"
+install -d "$share"
+cp -r "$AERIS_ROOT/themes" "$AERIS_ROOT/themed" "$share/"
+
+count=$(find "$share/themes" -name colors.toml | wc -l | tr -d ' ')
+echo "  installed aeris-theme with $count palettes"
+
+# Render as the user; everything lands under their ~/.local/state. No
+# AERIS_ROOT here on purpose, so this exercises the installed lookup path.
 theme=${AERIS_THEME:-tokyo-night}
-sudo -u "$TARGET_USER" -H env "AERIS_ROOT=$AERIS_ROOT" \
-  /usr/local/bin/aeris-theme set "$theme"
+sudo -u "$TARGET_USER" -H /usr/local/bin/aeris-theme set "$theme"

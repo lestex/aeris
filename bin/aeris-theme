@@ -15,15 +15,28 @@
 #   {{ key_rgb }}    "26,27,38"
 set -euo pipefail
 
-# Installed to /usr/local/bin, this script no longer sits beside themes/ and
-# themed/, so an explicit AERIS_ROOT wins; the path-derived value is the
-# fallback for running it straight out of the repo.
-if [[ -n ${AERIS_ROOT:-} && -d ${AERIS_ROOT:-}/themes ]]; then
-  : # provided by the caller
-else
-  AERIS_ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
-fi
-[[ -d $AERIS_ROOT/themes ]] || { echo "aeris-theme: no themes/ under $AERIS_ROOT; set AERIS_ROOT" >&2; exit 1; }
+# Where themes/ and themed/ live, in order:
+#   1. $AERIS_ROOT              — caller's choice; point it at the repo while
+#                                 iterating on templates
+#   2. /usr/local/share/aerisos — installed by setup.d/70-theme.sh
+#   3. ../ from this script     — running straight out of a checkout
+resolve_root() {
+  local self candidate
+  self=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+  for candidate in "${AERIS_ROOT:-}" /usr/local/share/aerisos "$self"; do
+    [[ -n $candidate && -d $candidate/themes && -d $candidate/themed ]] || continue
+    printf '%s' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+AERIS_ROOT=$(resolve_root) || {
+  echo "aeris-theme: cannot find themes/ and themed/." >&2
+  echo "  looked at: \$AERIS_ROOT, /usr/local/share/aerisos, and beside this script" >&2
+  echo "  run setup.d/70-theme.sh, or set AERIS_ROOT to a checkout" >&2
+  exit 1
+}
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/aerisos"
 CURRENT="$STATE/current"
 
