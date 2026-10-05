@@ -16,7 +16,7 @@ mapfile -t pkgs < <(
   grep -hvE '^[[:space:]]*(#|$)' \
     "$AERIS_ROOT/packages/base.txt" \
     "$AERIS_ROOT/packages/desktop.txt" \
-    "$list" | tr -d '[:space:]' | sort -u
+    "$list" | sed 's/[[:space:]]//g' | awk 'NF' | sort -u
 )
 (( ${#pkgs[@]} )) || { echo "no packages listed" >&2; exit 1; }
 
@@ -26,7 +26,7 @@ mapfile -t pkgs < <(
 mapfile -t missing < <(
   comm -23 \
     <(printf '%s\n' "${pkgs[@]}") \
-    <(dnf -q repoquery --qf '%{name}' "${pkgs[@]}" 2>/dev/null | sort -u)
+    <(dnf -q repoquery --qf '%{name}\n' "${pkgs[@]}" 2>/dev/null | awk 'NF' | sort -u)
 )
 if (( ${#missing[@]} )); then
   echo "not available for $(uname -m) in the enabled repos:" >&2
@@ -40,7 +40,7 @@ fi
 mapfile -t want < <(
   comm -23 \
     <(printf '%s\n' "${pkgs[@]}") \
-    <(rpm -qa --qf '%{NAME}\n' | sort -u)
+    <(rpm -qa --qf '%{NAME}\n' | awk 'NF' | sort -u)
 )
 
 if (( ${#want[@]} )); then
