@@ -125,6 +125,25 @@ Keep the package list honest:
 dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 ```
 
+## Launcher and menus
+
+`fuzzel` is the launcher — in Fedora proper, so no COPR, and it themes through
+the same template system as everything else.
+
+| Binding | |
+| --- | --- |
+| `Alt/Super + Space` | app launcher |
+| `Alt/Super + M` | `aeris-menu` — themes, capture, power |
+
+`aeris-menu` is a page of shell over `fuzzel --dmenu`, which reads entries on
+stdin and prints the chosen one. Adding a menu is a list of labels and a `case`.
+
+**Not walker**, which Omarchy used to use and dropped: walker 2.x moved its
+providers into a separate `elephant` daemon, and on Fedora `elephant` fails to
+build in the COPR that ships walker — so walker would launch and find nothing.
+Omarchy itself replaced walker with a 1,480-line Quickshell menu; this does the
+same job in a page of shell because it only has to serve one person.
+
 ## Theming
 
 Palettes are Omarchy's, taken as data under its MIT licence (see

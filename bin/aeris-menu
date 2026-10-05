@@ -1,0 +1,72 @@
+#!/bin/bash
+# aeris-menu — Omarchy-style menus built on `fuzzel --dmenu`.
+#
+#   aeris-menu           root menu
+#   aeris-menu theme     the theme picker on its own
+#   aeris-menu power     power actions
+#   aeris-menu capture   screenshots
+#
+# fuzzel --dmenu reads newline-separated entries on stdin and prints the
+# chosen one, so a menu here is a list of labels plus a case statement. That
+# is the whole design: Omarchy replaced walker with 1,480 lines of QML, and
+# this does the same job in a page of shell because it does not have to be a
+# general-purpose menu engine for other people.
+set -euo pipefail
+
+# fuzzel exits non-zero when dismissed with Escape, which is a normal outcome
+# rather than a failure — swallow it so `set -e` does not treat it as one.
+pick() {
+  local prompt=$1
+  shift
+  fuzzel --dmenu --prompt "$prompt " "$@" 2>/dev/null || true
+}
+
+menu_theme() {
+  local choice
+  choice=$(aeris-theme list | sed 's/^[* ] *//' | pick "theme")
+  [[ -n $choice ]] || return 0
+  aeris-theme set "$choice"
+}
+
+menu_power() {
+  local choice
+  choice=$(printf '%s\n' Lock Suspend Reboot "Power off" "Log out" | pick "power")
+  case $choice in
+    Lock)        loginctl lock-session ;;
+    Suspend)     systemctl suspend ;;
+    Reboot)      systemctl reboot ;;
+    "Power off") systemctl poweroff ;;
+    "Log out")   hyprctl dispatch exit ;;
+    *)           return 0 ;;
+  esac
+}
+
+menu_capture() {
+  local choice
+  choice=$(printf '%s\n' "Region to clipboard" "Screen to clipboard" | pick "capture")
+  case $choice in
+    "Region to clipboard") grim -g "$(slurp)" - | wl-copy ;;
+    "Screen to clipboard") grim - | wl-copy ;;
+    *)                     return 0 ;;
+  esac
+}
+
+menu_root() {
+  local choice
+  choice=$(printf '%s\n' Apps Theme Capture Power | pick "aeris")
+  case $choice in
+    Apps)    exec fuzzel ;;
+    Theme)   menu_theme ;;
+    Capture) menu_capture ;;
+    Power)   menu_power ;;
+    *)       return 0 ;;
+  esac
+}
+
+case ${1:-} in
+  theme)   menu_theme ;;
+  power)   menu_power ;;
+  capture) menu_capture ;;
+  "")      menu_root ;;
+  *)       sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

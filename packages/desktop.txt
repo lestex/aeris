@@ -18,6 +18,10 @@ qt6-qt5compat
 foot
 alacritty
 kitty
+# Launcher. In Fedora proper, so no COPR — and `fuzzel --dmenu` is what
+# bin/aeris-menu is built on.
+fuzzel
+
 wl-clipboard
 grim
 slurp

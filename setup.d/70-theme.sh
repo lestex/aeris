@@ -14,6 +14,7 @@ set -euo pipefail
 share=/usr/local/share/aerisos
 
 install -Dm0755 "$AERIS_ROOT/bin/aeris-theme" /usr/local/bin/aeris-theme
+install -Dm0755 "$AERIS_ROOT/bin/aeris-menu"  /usr/local/bin/aeris-menu
 
 rm -rf "$share"
 install -d "$share"
