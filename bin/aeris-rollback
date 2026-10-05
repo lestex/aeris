@@ -3,6 +3,7 @@
 #
 #   aeris-rollback --list        show snapshots
 #   aeris-rollback <number>      roll back to that snapshot, then reboot
+#   aeris-rollback --prune       delete old root.rollback-* backups
 #
 # Why not `snapper rollback`: snapper only implements the openSUSE layout,
 # where / is itself a snapshot subvolume selected by the btrfs default
@@ -10,23 +11,11 @@
 # /etc/fstab and the kernel cmdline (rootflags=subvol=root), so the default
 # subvolume is never consulted and snapper reports "cannot detect ambit".
 # Rollback therefore has to put the restored content at that same name.
-#
-# The previous root is kept as root.rollback-<timestamp>. Delete it once the
-# rolled-back system has proved itself.
 set -euo pipefail
 
 die() { echo "aeris-rollback: $*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
-
-case ${1:-} in
-  --list | -l) exec snapper -c root list ;;
-  '' | -h | --help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
-esac
-
-target=$1
-[[ $target =~ ^[0-9]+$ ]] || die "snapshot number must be an integer, got '$target'"
-(( target > 0 )) || die "0 is the live system, not a snapshot"
 
 # Discover the layout rather than assuming it.
 dev=$(findmnt -no SOURCE --target / | sed 's/\[.*//')
@@ -38,42 +27,86 @@ snap_sub=$(findmnt -no FSROOT --target /.snapshots | sed 's|^/||') ||
 [[ -n $root_sub ]] || die "could not determine the root subvolume name"
 [[ -n $snap_sub ]] || die "could not determine the snapshots subvolume name"
 
-top=$(mktemp -d)
+top=""
 cleanup() {
+  [[ -n $top ]] || return 0
   if mountpoint -q "$top"; then umount "$top" || true; fi
   rmdir "$top" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-mount -o subvolid=5 "$dev" "$top"
+mount_top() {
+  top=$(mktemp -d)
+  mount -o subvolid=5 "$dev" "$top"
+}
 
-src="$top/$snap_sub/$target/snapshot"
-[[ -d $src ]] || die "snapshot $target not found on disk (try --list)"
+# Backups and their nested children, deepest first. A subvolume holding
+# nested subvolumes cannot be deleted directly, and systemd makes some
+# (/var/lib/portables, /var/lib/machines), so children must go first.
+backup_subvols() {
+  btrfs subvolume list "$top" | sed 's/.* path //' |
+    grep -E "^${root_sub}\.rollback-" |
+    awk '{ n = gsub(/\//, "/"); print n "\t" $0 }' | sort -rn | cut -f2-
+}
 
-stamp=$(date +%Y%m%d-%H%M%S)
-backup="$top/$root_sub.rollback-$stamp"
-[[ -e $backup ]] && die "backup path already exists: $backup"
+cmd_prune() {
+  mount_top
+  mapfile -t victims < <(backup_subvols)
+  if (( ${#victims[@]} == 0 )); then
+    echo "no ${root_sub}.rollback-* backups to prune"
+    return 0
+  fi
+  for v in "${victims[@]}"; do
+    echo "  deleting $v"
+    btrfs subvolume delete "$top/$v" >/dev/null
+  done
+  echo "pruned ${#victims[@]} subvolume(s)"
+}
 
-printf 'rolling back\n  live subvolume : %s\n  to snapshot    : %s\n  device         : %s\n\n' \
-  "$root_sub" "$target" "$dev"
+cmd_rollback() {
+  local target=$1
+  [[ $target =~ ^[0-9]+$ ]] || die "snapshot number must be an integer, got '$target'"
+  (( target > 0 )) || die "0 is the live system, not a snapshot"
 
-mv -- "$top/$root_sub" "$backup"
-if ! btrfs subvolume snapshot "$src" "$top/$root_sub"; then
-  mv -- "$backup" "$top/$root_sub"
-  die "btrfs snapshot failed — original root restored, nothing changed"
-fi
+  mount_top
 
-# /boot is a separate partition and is NOT rolled back, so the newest kernel
-# on disk may have no modules in the restored root. Name the safe entries.
-echo
-echo "kernel modules present in the restored root:"
-found=0
-for d in "$top/$root_sub"/lib/modules/*; do
-  if [[ -d $d ]]; then echo "  ${d##*/}"; found=1; fi
-done
-(( found )) || echo "  (none found — inspect before rebooting)"
+  local src="$top/$snap_sub/$target/snapshot"
+  [[ -d $src ]] || die "snapshot $target not found on disk (try --list)"
 
-cat <<SUMMARY
+  local stamp backup
+  stamp=$(date +%Y%m%d-%H%M%S)
+  backup="$top/$root_sub.rollback-$stamp"
+  [[ -e $backup ]] && die "backup path already exists: $backup"
+
+  printf 'rolling back\n  live subvolume : %s\n  to snapshot    : %s\n  device         : %s\n\n' \
+    "$root_sub" "$target" "$dev"
+
+  mv -- "$top/$root_sub" "$backup"
+  if ! btrfs subvolume snapshot "$src" "$top/$root_sub"; then
+    mv -- "$backup" "$top/$root_sub"
+    die "btrfs snapshot failed — original root restored, nothing changed"
+  fi
+
+  # Nested subvolumes are not captured by a btrfs snapshot, so anything that
+  # created one is absent from the restored root. Name them; they are the
+  # blind spot in any snapshot-based rollback.
+  local nested
+  nested=$(btrfs subvolume list -o "$top/$root_sub" 2>/dev/null | sed 's/.* path //' || true)
+  if [[ -n $nested ]]; then
+    echo
+    echo "nested subvolumes under the restored root (not rolled back):"
+    printf '  %s\n' $nested
+  fi
+
+  echo
+  echo "kernel modules present in the restored root:"
+  local found=0 d
+  for d in "$top/$root_sub"/lib/modules/*; do
+    if [[ -d $d ]]; then echo "  ${d##*/}"; found=1; fi
+  done
+  (( found )) || echo "  (none found — inspect before rebooting)"
+
+  cat <<SUMMARY
 
 running kernel : $(uname -r)
 previous root  : ${backup#"$top"/}
@@ -82,5 +115,14 @@ previous root  : ${backup#"$top"/}
 boots by default is not listed above, pick one that is from the boot menu,
 then "dnf reinstall kernel-core" to resync.
 
-Reboot when ready:  systemctl reboot
+Reboot when ready:   systemctl reboot
+Reclaim space later: aeris-rollback --prune
 SUMMARY
+}
+
+case ${1:-} in
+  --list | -l)      exec snapper -c root list ;;
+  --prune)          cmd_prune ;;
+  '' | -h | --help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)                cmd_rollback "$1" ;;
+esac
