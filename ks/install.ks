@@ -47,6 +47,14 @@ reboot
 # through Recommends:, and this turns all of it off.
 %packages --exclude-weakdeps
 @core
+
+# pam_systemd.so. systemd only *recommends* systemd-pam, so --exclude-weakdeps
+# drops it — and then no login registers a logind session, XDG_RUNTIME_DIR is
+# never set, and nothing graphical can acquire DRM master. It fails silently
+# because Fedora's PAM stack says "-session optional pam_systemd.so", where the
+# leading - means skip quietly when the module is missing.
+systemd-pam
+
 btrfs-progs
 snapper
 libdnf5-plugin-actions

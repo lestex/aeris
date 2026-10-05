@@ -136,6 +136,21 @@ dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 Phases 1 and 2 have nothing to do with the desktop, and they are the ones that
 can waste a weekend. Do them first, boringly.
 
+## The cost of --exclude-weakdeps
+
+`--exclude-weakdeps` is the minimalism lever, and it removes things that are
+structurally necessary but only *recommended*. Each of these cost a debugging
+round, and all three fail quietly rather than loudly:
+
+| Package | Weak dependency of | Symptom when missing |
+| --- | --- | --- |
+| `systemd-pam` | `systemd` | no `XDG_RUNTIME_DIR`, no logind session, no compositor |
+| `mesa-dri-drivers` | the graphics stack | compositor starts with no renderer |
+
+When something graphical or session-related misbehaves on a system built this
+way, suspect a dropped weak dependency before suspecting your own config.
+`dnf repoquery --recommends <pkg>` shows what was skipped.
+
 ## The compositor comes from a COPR
 
 Hyprland is **not in Fedora's official repos** for any release. It comes from

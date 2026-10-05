@@ -1,4 +1,10 @@
 # CLI base. Installed with weak deps off.
+
+# pam_systemd.so — a weak dependency of systemd, so --exclude-weakdeps drops
+# it and logins register no logind session. Listed here as well as in the
+# kickstart so machines installed before this was noticed get repaired.
+systemd-pam
+
 bat
 btop
 eza
