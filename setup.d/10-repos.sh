@@ -24,6 +24,15 @@ if [[ ${AERIS_COMPOSITOR:-hyprland} == "hyprland" ]]; then
   dnf -y copr enable "${AERIS_HYPRLAND_COPR:-lionheartp/Hyprland}"
 fi
 
+# ghostty is not in Fedora either, and unlike Hyprland no COPR has clear
+# standing — several carry a *failed* latest build. Opt in by naming one:
+#   AERIS_GHOSTTY_COPR=scottames/ghostty sudo -E ./setup 10 40
+# scottames/ghostty is the one to start from: 1.3.1-4, a successful release
+# build, aarch64 and x86_64 on f44.
+if [[ -n ${AERIS_GHOSTTY_COPR:-} ]]; then
+  dnf -y copr enable "$AERIS_GHOSTTY_COPR"
+fi
+
 # quickshell needs no COPR of its own: it is in Fedora f44 updates, and the
 # hyprland COPR above also carries it. Re-enable only if your release lacks it:
 #   dnf -y copr enable errornointernet/quickshell

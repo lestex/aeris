@@ -166,13 +166,21 @@ config, where it would fail far from its cause. Use only the keys listed in
 
 For btop, set `color_theme = "aeris"` in its config once.
 
-**ghostty is not in Fedora.** `foot`, `alacritty` and `kitty` all are. For
-ghostty, pick a COPR yourself — several carry f43–f45 on both architectures
-(`cube1ber/ghostty`, `myriad-sun/ghostty`, `boydkelly/ghostty-tip`), but
-unlike the Hyprland COPR there is no obvious community default, so check one
-before depending on it. The template and config are shipped either way, and
-`dotfiles/ghostty/` contains both `config` and `config.ghostty` because
-released and newer builds look for different filenames.
+**ghostty is not in Fedora**, and is opt-in. `foot`, `alacritty` and `kitty`
+all come from Fedora proper; ghostty needs a COPR you name:
+
+```
+AERIS_GHOSTTY_COPR=scottames/ghostty sudo -E ./setup 10 40
+```
+
+`scottames/ghostty` is the one to start from — 1.3.1-4, a successful release
+build, aarch64 and x86_64 on f44. Check before switching to another: several
+ghostty COPRs carry a *failed* latest build, which says something about how
+fussy the package is rather than about any one maintainer.
+
+`dotfiles/ghostty/` ships both `config` and `config.ghostty`: 1.3.x reads the
+first, newer builds the second, and the unused one is simply never read. The
+template renders either way, so theming works the moment ghostty is installed.
 
 **foot does not reload.** It has no reload signal: `SIGUSR1`/`SIGUSR2` switch
 between the `[colors-dark]` and `[colors-light]` sections of the already-loaded

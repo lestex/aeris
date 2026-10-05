@@ -12,11 +12,21 @@ list="$AERIS_ROOT/packages/compositor-$compositor.txt"
 
 echo "  compositor: $compositor"
 
+# ghostty rides along only when its COPR was named; see setup.d/10-repos.sh.
+extra=()
+if [[ -n ${AERIS_GHOSTTY_COPR:-} ]]; then
+  extra+=(ghostty)
+  echo "  ghostty: from $AERIS_GHOSTTY_COPR"
+fi
+
 mapfile -t pkgs < <(
-  grep -hvE '^[[:space:]]*(#|$)' \
-    "$AERIS_ROOT/packages/base.txt" \
-    "$AERIS_ROOT/packages/desktop.txt" \
-    "$list" | sed 's/[[:space:]]//g' | awk 'NF' | sort -u
+  {
+    grep -hvE '^[[:space:]]*(#|$)' \
+      "$AERIS_ROOT/packages/base.txt" \
+      "$AERIS_ROOT/packages/desktop.txt" \
+      "$list"
+    (( ${#extra[@]} )) && printf '%s\n' "${extra[@]}"
+  } | sed 's/[[:space:]]//g' | awk 'NF' | sort -u
 )
 (( ${#pkgs[@]} )) || { echo "no packages listed" >&2; exit 1; }
 
