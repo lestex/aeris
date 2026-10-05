@@ -140,8 +140,25 @@ than Space: `Cmd+Space` is Spotlight, which the host takes before the guest
 sees it, and `Option+Space` types a non-breaking space. On real hardware the
 Super bindings are the ones to use.
 
-`aeris-menu` is a page of shell over `fuzzel --dmenu`, which reads entries on
-stdin and prints the chosen one. Adding a menu is a list of labels and a `case`.
+`aeris-menu` mirrors Omarchy's root — Apps, Style, Trigger, Setup, Install,
+Remove, Update, System, About — minus Learn, which pointed at their manual:
+
+| | |
+| --- | --- |
+| Style | Theme (all 22), Font |
+| Trigger | Capture (region/screen/window), Clipboard, Colour picker |
+| Setup | Config, Keybindings, Network |
+| Install / Remove | type a package name; runs dnf in a terminal |
+| Update | System packages, Snapshots |
+| System | Lock, Suspend, Logout, Reboot, Shutdown |
+
+Each submenu is also a direct entry point: `aeris-menu theme`, `aeris-menu
+system`, and so on, so any of them can be bound to a key.
+
+It is a list of labels and a `case` statement over `fuzzel --dmenu`. Omarchy's
+equivalent is 1,480 lines of QML plus a 380-line JSONC schema with providers,
+guards and conditional rows, because theirs has to be extended declaratively
+by people who did not write it.
 
 **Not walker**, which Omarchy used to use and dropped: walker 2.x moved its
 providers into a separate `elephant` daemon, and on Fedora `elephant` fails to

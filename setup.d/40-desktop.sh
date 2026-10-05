@@ -26,7 +26,7 @@ mapfile -t pkgs < <(
       "$AERIS_ROOT/packages/desktop.txt" \
       "$list"
     (( ${#extra[@]} )) && printf '%s\n' "${extra[@]}"
-  } | sed 's/[[:space:]]//g' | awk 'NF' | sort -u
+  } | sed -e 's/#.*//' -e 's/[[:space:]]//g' | awk 'NF' | sort -u
 )
 (( ${#pkgs[@]} )) || { echo "no packages listed" >&2; exit 1; }
 

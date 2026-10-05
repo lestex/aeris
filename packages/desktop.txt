@@ -22,6 +22,9 @@ kitty
 # bin/aeris-menu is built on.
 fuzzel
 
+# Setup > Network
+NetworkManager-tui
+
 wl-clipboard
 grim
 slurp

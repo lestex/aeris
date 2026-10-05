@@ -17,3 +17,11 @@
 hyprland
 hyprpolkitagent
 xdg-desktop-portal-hyprland
+
+# Backing aeris-menu entries, all from the same COPR as hyprland:
+#   hyprlock    System > Lock
+#   hyprpicker  Trigger > Color picker
+#   cliphist    Trigger > Clipboard
+hyprlock
+hyprpicker
+cliphist

@@ -1,25 +1,45 @@
 #!/bin/bash
-# aeris-menu — Omarchy-style menus built on `fuzzel --dmenu`.
+# aeris-menu — Omarchy-shaped menus built on `fuzzel --dmenu`.
 #
-#   aeris-menu           root menu
-#   aeris-menu theme     the theme picker on its own
-#   aeris-menu power     power actions
-#   aeris-menu capture   screenshots
+#   aeris-menu              root menu
+#   aeris-menu <submenu>    jump straight in: style, trigger, capture,
+#                           setup, update, system, install, remove, about
 #
-# fuzzel --dmenu reads newline-separated entries on stdin and prints the
-# chosen one, so a menu here is a list of labels plus a case statement. That
-# is the whole design: Omarchy replaced walker with 1,480 lines of QML, and
-# this does the same job in a page of shell because it does not have to be a
-# general-purpose menu engine for other people.
+# fuzzel --dmenu reads newline-separated entries on stdin and prints the one
+# chosen; if the typed text matches nothing it prints the text itself, which
+# is what makes the install/remove prompts work.
+#
+# The shape mirrors Omarchy's root — Apps, Style, Trigger, Setup, Install,
+# Remove, Update, System, About — minus Learn, which pointed at their manual.
+# Theirs is 1,480 lines of QML plus a 380-line JSONC schema with providers and
+# conditional rows, because it has to be extensible by strangers. This is a
+# list of labels and a case statement.
 set -euo pipefail
 
-# fuzzel exits non-zero when dismissed with Escape, which is a normal outcome
-# rather than a failure — swallow it so `set -e` does not treat it as one.
+# fuzzel exits non-zero when dismissed with Escape. That is a normal outcome,
+# not a failure, so it must not reach `set -e`.
 pick() {
   local prompt=$1
   shift
   fuzzel --dmenu --prompt "$prompt " "$@" 2>/dev/null || true
 }
+
+# Run a command in a terminal window. kitty and foot both take `term cmd...`
+# directly; alacritty and ghostty would need -e, so prefer the first two.
+run_term() {
+  local t
+  for t in kitty foot; do
+    if command -v "$t" >/dev/null 2>&1; then
+      setsid "$t" "$@" >/dev/null 2>&1 &
+      return 0
+    fi
+  done
+  echo "aeris-menu: no terminal found" >&2
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- style -----------------------------------------------------------------
 
 menu_theme() {
   local choice
@@ -28,45 +48,136 @@ menu_theme() {
   aeris-theme set "$choice"
 }
 
-menu_power() {
-  local choice
-  choice=$(printf '%s\n' Lock Suspend Reboot "Power off" "Log out" | pick "power")
-  case $choice in
-    Lock)        loginctl lock-session ;;
-    Suspend)     systemctl suspend ;;
-    Reboot)      systemctl reboot ;;
-    "Power off") systemctl poweroff ;;
-    "Log out")   hyprctl dispatch exit ;;
+menu_style() {
+  case $(printf '%s\n' Theme Font | pick "style") in
+    Theme) menu_theme ;;
+    Font)  run_term "${EDITOR:-vim}" "$HOME/aerisos/dotfiles/hypr/hyprland.conf" ;;
+    *)     return 0 ;;
+  esac
+}
+
+# --- trigger ---------------------------------------------------------------
+
+menu_capture() {
+  case $(printf '%s\n' Region Screen Window | pick "capture") in
+    Region) grim -g "$(slurp)" - | wl-copy ;;
+    Screen) grim - | wl-copy ;;
+    Window) grim -g "$(hyprctl activewindow -j |
+              jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')" - | wl-copy ;;
+    *)      return 0 ;;
+  esac
+}
+
+menu_trigger() {
+  case $(printf '%s\n' Capture Clipboard "Color picker" | pick "trigger") in
+    Capture)   menu_capture ;;
+    Clipboard)
+      if have cliphist; then
+        local entry
+        entry=$(cliphist list | pick "clipboard")
+        [[ -n $entry ]] && printf '%s' "$entry" | cliphist decode | wl-copy
+      fi
+      ;;
+    "Color picker") have hyprpicker && hyprpicker -a ;;
+    *) return 0 ;;
+  esac
+}
+
+# --- setup -----------------------------------------------------------------
+
+menu_setup() {
+  case $(printf '%s\n' Config Keybindings Network | pick "setup") in
+    Config)
+      local file
+      file=$(find "$HOME/aerisos/dotfiles" -type f | sed "s|$HOME/aerisos/dotfiles/||" | sort | pick "config")
+      [[ -n $file ]] && run_term "${EDITOR:-vim}" "$HOME/aerisos/dotfiles/$file"
+      ;;
+    Keybindings) run_term bash -lc 'hyprctl binds | less' ;;
+    Network)     have nmtui && run_term nmtui ;;
     *)           return 0 ;;
   esac
 }
 
-menu_capture() {
-  local choice
-  choice=$(printf '%s\n' "Region to clipboard" "Screen to clipboard" | pick "capture")
-  case $choice in
-    "Region to clipboard") grim -g "$(slurp)" - | wl-copy ;;
-    "Screen to clipboard") grim - | wl-copy ;;
-    *)                     return 0 ;;
+# --- install / remove ------------------------------------------------------
+
+menu_install() {
+  local pkg
+  pkg=$(: | pick "install")
+  [[ -n $pkg ]] || return 0
+  run_term bash -lc "sudo dnf install '$pkg'; echo; read -rsn1 -p 'done — any key to close'"
+}
+
+menu_remove() {
+  local pkg
+  pkg=$(dnf repoquery --userinstalled --qf '%{name}' 2>/dev/null | sort -u | pick "remove")
+  [[ -n $pkg ]] || return 0
+  run_term bash -lc "sudo dnf remove '$pkg'; echo; read -rsn1 -p 'done — any key to close'"
+}
+
+# --- update ----------------------------------------------------------------
+
+menu_update() {
+  case $(printf '%s\n' System Snapshots | pick "update") in
+    System)    run_term bash -lc "sudo dnf upgrade; echo; read -rsn1 -p 'done — any key to close'" ;;
+    Snapshots) run_term bash -lc 'sudo aeris-rollback --list | less' ;;
+    *)         return 0 ;;
   esac
 }
 
+# --- system ----------------------------------------------------------------
+
+menu_system() {
+  case $(printf '%s\n' Lock Suspend Logout Reboot Shutdown | pick "system") in
+    Lock)     have hyprlock && hyprlock ;;
+    Suspend)  systemctl suspend ;;
+    Logout)   hyprctl dispatch exit ;;
+    Reboot)   systemctl reboot ;;
+    Shutdown) systemctl poweroff ;;
+    *)        return 0 ;;
+  esac
+}
+
+# --- about -----------------------------------------------------------------
+
+menu_about() {
+  run_term bash -lc '
+    . /etc/os-release
+    printf "%s\n\n" "$PRETTY_NAME"
+    printf "kernel     %s\n" "$(uname -r)"
+    printf "compositor Hyprland %s\n" "$(hyprctl version -j | jq -r .tag 2>/dev/null || echo "?")"
+    printf "theme      %s\n" "$(aeris-theme current 2>/dev/null || echo none)"
+    printf "uptime     %s\n" "$(uptime -p)"
+    echo; read -rsn1 -p "any key to close"'
+}
+
+# --- root ------------------------------------------------------------------
+
 menu_root() {
-  local choice
-  choice=$(printf '%s\n' Apps Theme Capture Power | pick "aeris")
-  case $choice in
+  case $(printf '%s\n' Apps Style Trigger Setup Install Remove Update System About | pick "aeris") in
     Apps)    exec fuzzel ;;
-    Theme)   menu_theme ;;
-    Capture) menu_capture ;;
-    Power)   menu_power ;;
+    Style)   menu_style ;;
+    Trigger) menu_trigger ;;
+    Setup)   menu_setup ;;
+    Install) menu_install ;;
+    Remove)  menu_remove ;;
+    Update)  menu_update ;;
+    System)  menu_system ;;
+    About)   menu_about ;;
     *)       return 0 ;;
   esac
 }
 
 case ${1:-} in
+  style)   menu_style ;;
   theme)   menu_theme ;;
-  power)   menu_power ;;
+  trigger) menu_trigger ;;
   capture) menu_capture ;;
+  setup)   menu_setup ;;
+  install) menu_install ;;
+  remove)  menu_remove ;;
+  update)  menu_update ;;
+  system)  menu_system ;;
+  about)   menu_about ;;
   "")      menu_root ;;
-  *)       sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)       sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
