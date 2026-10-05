@@ -54,6 +54,10 @@ install -Dm0644 "$AERIS_ROOT/etc/dnf/libdnf5-plugins/actions.d/snapper.actions" 
 
 systemctl enable --now snapper-cleanup.timer
 
+# `snapper rollback` only understands the openSUSE layout; see the header of
+# bin/aeris-rollback for why this layout needs its own tool.
+install -Dm0755 "$AERIS_ROOT/bin/aeris-rollback" /usr/local/bin/aeris-rollback
+
 # Snapshot entries in the boot menu — x86_64 only, see 10-repos.sh.
 if [[ $(uname -m) == "x86_64" ]]; then
   dnf -y install grub-btrfs

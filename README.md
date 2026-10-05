@@ -61,23 +61,42 @@ Do this on the fresh install, while nothing is at stake. An untested rollback
 path is not a rollback path.
 
 ```
-sudo dnf install -y cowsay          # anything; the hook snapshots it
+sudo dnf install -y sl              # anything; the dnf hook snapshots it
 sudo snapper -c root list           # confirm a pre/post pair appeared
-
-# Reboot, pick the snapshot from the GRUB submenu. It mounts read-only —
-# that is correct, and it is the point: you get to confirm this really is
-# the good state before committing.
-
-sudo snapper -c root rollback <number>
+sudo aeris-rollback --list
+sudo aeris-rollback <pre-number>
 sudo systemctl reboot
+
+rpm -q sl                           # should be gone
+ls /usr/bin/sl                      # and gone here too — they must agree
 ```
 
-`snapper rollback` works at the subvolume level: it saves the broken state as
-a read-only snapshot, derives a writable subvolume from your target, and makes
-that the default. No overlay needed.
+Those last two lines are the real check on the subvolume layout: the RPM
+database lives in `/var/lib/rpm`, inside the snapshotted root, so the package
+database and the filesystem have to roll back together.
 
-If there is no Snapshots submenu in GRUB, `grub-btrfsd` is not running —
-re-run `sudo ./setup 20`.
+### Why not `snapper rollback`
+
+Snapper implements rollback only for the openSUSE layout, where `/` is itself
+a snapshot subvolume chosen by the btrfs *default subvolume*. Here `/` is a
+plain subvolume named `root`, and both `/etc/fstab` and the kernel cmdline pin
+`subvol=root`, so the default subvolume is never consulted — `snapper
+rollback` reports *"cannot detect ambit since default subvolume is unknown"*
+and refuses.
+
+`aeris-rollback` instead mounts the btrfs top level, moves `root` aside, and
+snapshots the chosen snapshot into its place, so the pinned `subvol=root`
+resolves to the restored content. The old root is kept as
+`root.rollback-<timestamp>`; delete it once the rolled-back system has proved
+itself.
+
+### One limitation
+
+`/boot` is a separate partition and is **not** rolled back, while
+`/lib/modules` is on the root subvolume. So rolling back past a kernel update
+leaves a kernel on disk whose modules are gone. `aeris-rollback` prints which
+kernel versions have modules in the restored root — pick one of those at the
+boot menu, then `dnf reinstall kernel-core` to resync.
 
 ## Update habit
 
