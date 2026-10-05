@@ -144,7 +144,7 @@ config *includes* its generated file rather than being rewritten:
 | Config | How it picks the theme up |
 | --- | --- |
 | `hypr/hyprland.conf` | `source =` the generated file, last so it wins |
-| `foot/foot.ini` | `include=` as the first line |
+| `foot/foot.ini` | `include=` as the first line; section must be `[colors-dark]` |
 | btop | rendered theme copied to `~/.config/btop/themes/aeris.theme` |
 | Quickshell | `FileView` reads `colors.json` with `watchChanges`, so the bar repaints live |
 
@@ -162,6 +162,11 @@ config, where it would fail far from its cause. Use only the keys listed in
 `themes/README.md`; all 22 palettes define them.
 
 For btop, set `color_theme = "aeris"` in its config once.
+
+**foot does not reload.** It has no reload signal: `SIGUSR1`/`SIGUSR2` switch
+between the `[colors-dark]` and `[colors-light]` sections of the already-loaded
+config rather than re-reading the file. Open a new window after switching
+themes. Hyprland, btop and the bar all update live.
 
 ## Phases
 

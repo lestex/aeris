@@ -159,9 +159,14 @@ reload() {
     hyprctl reload >/dev/null && echo "  hyprland reloaded"
   fi
 
-  # foot re-reads its config on SIGUSR1, per foot(1).
-  if pgrep -x foot >/dev/null 2>&1; then
-    pkill -USR1 -x foot && echo "  foot reloaded"
+  # foot cannot be reloaded. It has no reload signal — SIGUSR1/SIGUSR2 switch
+  # between the [colors-dark] and [colors-light] sections of the config it
+  # already loaded, they do not re-read the file. Running windows keep their
+  # colours; new ones pick up the theme.
+  local running
+  running=$(pgrep -x foot 2>/dev/null | wc -l | tr -d " ")
+  if (( running > 0 )); then
+    echo "  $running foot window(s) keep the old colours — foot has no reload; open a new one"
   fi
 
   # Quickshell watches its own config and the files it reads; nothing to do.
