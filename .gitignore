@@ -1,2 +1,7 @@
 out/
 *.iso
+
+# Theme wallpapers, imported with bin/aeris-backgrounds-import.
+# Untracked on purpose: 52 MB of images in git is what leaves Omarchy's own
+# repository with a .git bigger than its working tree.
+themes/*/backgrounds/

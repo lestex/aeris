@@ -16,6 +16,8 @@
 # background. Omarchy uses a symlink there, which works because their shell
 # polls it; a text file is watchable by Quickshell's FileView instead, so the
 # wallpaper changes the moment this runs rather than on the next poll.
+# Requires bash 4+ (mapfile). Fedora has bash 5; macOS ships 3.2, so test
+# from a checkout on a Mac with brew's bash, not /bin/bash.
 set -euo pipefail
 
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/aerisos"

@@ -1,0 +1,51 @@
+#!/bin/bash
+# aeris-backgrounds-import — copy theme wallpapers from an Omarchy checkout.
+#
+#   aeris-backgrounds-import [path-to-omarchy]   default: ../omarchy/omarchy
+#
+# Images land in themes/<name>/backgrounds/, which aeris-background prefers
+# when that theme is active.
+#
+# They are deliberately NOT tracked by git (see .gitignore). 92 images is
+# ~52 MB, and committing them is what leaves Omarchy's own repository with a
+# .git larger than its working tree — every wallpaper ever replaced is still
+# in there. Re-run this instead; it is reproducible and costs nothing.
+set -euo pipefail
+
+AERIS_ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+SRC=${1:-$AERIS_ROOT/../omarchy/omarchy}
+
+[[ -d $SRC/themes ]] || {
+  echo "aeris-backgrounds-import: no themes/ under $SRC" >&2
+  echo "  pass the path to an omarchy checkout" >&2
+  exit 1
+}
+
+copied=0
+themes=0
+for src in "$SRC"/themes/*/backgrounds; do
+  [[ -d $src ]] || continue
+  name=$(basename "$(dirname "$src")")
+  dest="$AERIS_ROOT/themes/$name/backgrounds"
+
+  # Only for themes we actually carry a palette for.
+  [[ -f $AERIS_ROOT/themes/$name/colors.toml ]] || continue
+
+  mkdir -p "$dest"
+  n=0
+  while IFS= read -r img; do
+    cp -f "$img" "$dest/"
+    n=$((n + 1))
+  done < <(find "$src" -maxdepth 1 -type f \
+             \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \))
+
+  if (( n > 0 )); then
+    printf '  %-18s %2d\n' "$name" "$n"
+    copied=$((copied + n))
+    themes=$((themes + 1))
+  fi
+done
+
+echo
+echo "$copied images across $themes themes"
+du -shc "$AERIS_ROOT"/themes/*/backgrounds 2>/dev/null | tail -1

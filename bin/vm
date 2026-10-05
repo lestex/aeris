@@ -8,6 +8,7 @@
 #                       resolution: AERIS_VM_RES=1920x1080 bin/vm boot --gui
 #   bin/vm sync         copy this working tree to ~/aerisos in the running VM
 #   bin/vm sync --clean same, but delete the old tree first (prunes stale files)
+#   bin/vm backgrounds  push the theme wallpapers, which sync skips
 #   bin/vm ssh [cmd]    ssh into the running VM
 #   bin/vm hyprctl ...  run hyprctl in the guest's Hyprland session
 #   bin/vm save | reset save the VM disk as "fresh" / roll back to it
@@ -184,7 +185,11 @@ cmd_sync() {
   local stage
   stage=$(mktemp -d)
   trap 'rm -rf "$stage"' RETURN
-  rsync -a --exclude=/out --exclude=/.git "$ROOT/" "$stage/aerisos/"
+  # Wallpapers are ~52 MB and change rarely, so the routine sync skips them;
+  # `bin/vm backgrounds` pushes them when they do change. Copying them on
+  # every edit would turn a two-second loop into a half-minute one.
+  rsync -a --exclude=/out --exclude=/.git --exclude='themes/*/backgrounds' \
+    "$ROOT/" "$stage/aerisos/"
 
   # Copy over the top rather than deleting first. ~/.config/hypr and
   # ~/.config/quickshell are symlinks into this tree, and removing it out
@@ -206,6 +211,21 @@ cmd_sync() {
   echo "try: bin/vm ssh 'cd aerisos && sudo ./setup 20'"
 }
 
+# Push the wallpapers, which bin/vm sync deliberately leaves out.
+cmd_backgrounds() {
+  local n
+  n=$(find "$ROOT"/themes/*/backgrounds -type f 2>/dev/null | wc -l | tr -d " ")
+  if [[ -z $n || $n == 0 ]]; then
+    echo "no images — run bin/aeris-backgrounds-import first" >&2
+    return 1
+  fi
+  echo "pushing $n images ($(du -shc "$ROOT"/themes/*/backgrounds 2>/dev/null | tail -1 | cut -f1))..."
+  rsync -a -e "ssh -p $SSH_PORT ${SSH_OPTS[*]}" \
+    --include='*/' --include='backgrounds/***' --exclude='*' \
+    "$ROOT/themes/" "$USER_NAME@localhost:aerisos/themes/"
+  echo "done"
+}
+
 cmd_snapshot() {
   if pgrep -f "qemu-system-aarch64.*$DISK" >/dev/null; then
     echo "shut the VM down first (sudo poweroff inside it)" >&2; exit 1
@@ -220,7 +240,8 @@ cmd_snapshot() {
 case ${1:-} in
   install)    shift; cmd_install "$@" ;;
   boot)       shift; cmd_boot "$@" ;;
-  sync)       shift; cmd_sync "$@" ;;
+  sync)        shift; cmd_sync "$@" ;;
+  backgrounds) cmd_backgrounds ;;
   ssh)        shift; ssh_vm "$@" ;;
   hyprctl)    shift; cmd_hyprctl "$@" ;;
   save|reset) cmd_snapshot "$1" ;;

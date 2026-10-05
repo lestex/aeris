@@ -211,10 +211,26 @@ The chosen path is plain text in `~/.local/state/aerisos/current/background`.
 Omarchy uses a symlink there and polls it; a text file is watchable by
 `FileView`, so the wallpaper changes the instant the command runs.
 
-**No wallpapers ship with AerisOS.** Omarchy's were not copied — they are
-images with their own provenance, and the MIT license covers their code, not
-every asset in the repository. With none present the desktop shows the theme's
-background color, which is a finished state rather than a broken one.
+### Importing Omarchy's wallpapers
+
+```
+bin/aeris-backgrounds-import [path-to-omarchy]    # default ../omarchy/omarchy
+bin/vm backgrounds                                 # push them to the VM
+```
+
+92 images across all 22 themes, ~52 MB.
+
+**They are not tracked by git**, on purpose. Committing wallpapers is what
+leaves Omarchy's own repository with a `.git` larger than its working tree —
+every image ever replaced is still in the history. The import is reproducible,
+so there is nothing to preserve by tracking it.
+
+For the same reason `bin/vm sync` skips them and `bin/vm backgrounds` pushes
+them separately: 52 MB on every edit would turn a two-second loop into a
+half-minute one.
+
+With no images imported the desktop shows the theme's background color, which
+is a finished state rather than a broken one.
 
 ## Theming
 
