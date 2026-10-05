@@ -1,6 +1,0 @@
-config-file = ~/.local/state/aerisos/current/ghostty.conf
-
-font-family = JetBrains Mono
-font-size = 10
-window-padding-x = 8
-window-padding-y = 8

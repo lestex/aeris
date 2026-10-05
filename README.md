@@ -178,9 +178,11 @@ build, aarch64 and x86_64 on f44. Check before switching to another: several
 ghostty COPRs carry a *failed* latest build, which says something about how
 fussy the package is rather than about any one maintainer.
 
-`dotfiles/ghostty/` ships both `config` and `config.ghostty`: 1.3.x reads the
-first, newer builds the second, and the unused one is simply never read. The
-template renders either way, so theming works the moment ghostty is installed.
+`dotfiles/ghostty/` holds exactly one config file, deliberately. Ghostty reads
+both `config` and `config.ghostty` where it knows the newer name, so shipping
+the settings twice makes it load the same `config-file` twice and report
+*"cycle detected"*. If a future build stops reading `config`, rename rather
+than adding a second copy.
 
 **foot does not reload.** It has no reload signal: `SIGUSR1`/`SIGUSR2` switch
 between the `[colors-dark]` and `[colors-light]` sections of the already-loaded

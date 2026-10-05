@@ -1,3 +1,10 @@
+# Ghostty reads BOTH ~/.config/ghostty/config and config.ghostty where it
+# supports the newer name, so shipping the same settings under both filenames
+# makes it load the same config-file twice — which its cycle guard reports as
+# "cycle detected". Keep exactly one file here.
+#
+# If a future ghostty stops reading `config`, rename this to `config.ghostty`
+# rather than adding a second copy.
 config-file = ~/.local/state/aerisos/current/ghostty.conf
 
 font-family = JetBrains Mono
