@@ -1,0 +1,7 @@
+# Sway. In Fedora's official repos for every architecture, and it ships a
+# working /etc/sway/config, so it needs nothing from dotfiles/. This is the
+# compositor to validate the graphics path with — virtio-gpu, DRM, llvmpipe,
+# the logind session — because none of that is compositor-specific.
+sway
+swaybg
+xdg-desktop-portal-wlr

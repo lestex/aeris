@@ -17,4 +17,17 @@ else
   echo "  skipping grub-btrfs COPR: no $arch build available"
 fi
 
+# Hyprland is not in Fedora's repos at all, so it needs a COPR — and the
+# available ones are personal repos with uneven release/arch coverage. Opt in
+# explicitly rather than having setup pick a stranger's repo for you.
+if [[ ${AERIS_COMPOSITOR:-sway} == "hyprland" ]]; then
+  if [[ -n ${AERIS_HYPRLAND_COPR:-} ]]; then
+    dnf -y copr enable "$AERIS_HYPRLAND_COPR"
+  else
+    echo "  AERIS_COMPOSITOR=hyprland but AERIS_HYPRLAND_COPR is unset" >&2
+    echo "  pick one and check its chroots first; see packages/compositor-hyprland.txt" >&2
+    exit 1
+  fi
+fi
+
 dnf -y makecache

@@ -136,6 +136,36 @@ dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 Phases 1 and 2 have nothing to do with the desktop, and they are the ones that
 can waste a weekend. Do them first, boringly.
 
+## The compositor is a choice
+
+Hyprland is **not in Fedora's official repos** for any release. The canonical
+COPR (`solopasha/hyprland`) currently builds rawhide/x86_64 only, and the
+COPRs that do cover other releases and aarch64 are small personal repos.
+
+| | Sway (default) | Hyprland |
+| --- | --- | --- |
+| Source | Fedora official repos | a personal COPR |
+| Architectures | all | depends on the COPR |
+| Config needed | none, ships a working one | `dotfiles/hypr/hyprland.conf` |
+
+```
+sudo ./setup 40                                   # sway
+AERIS_COMPOSITOR=hyprland \
+  AERIS_HYPRLAND_COPR=owner/project \
+  sudo -E ./setup 10 40                           # hyprland
+```
+
+Check a COPR's coverage before depending on it:
+
+```
+curl -s "https://copr.fedorainfracloud.org/api_3/project?ownername=OWNER&projectname=PROJ" \
+  | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin)["chroot_repos"]))'
+```
+
+Use Sway in the VM regardless of what you want on the real machine: the VM's
+job is to prove the graphics path works — virtio-gpu, DRM, llvmpipe, the
+logind session — and none of that is compositor-specific.
+
 ## Dev VM vs target machine
 
 `bin/vm` runs an **aarch64** guest (native `hvf` on Apple Silicon, so it is
