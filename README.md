@@ -146,6 +146,7 @@ config *includes* its generated file rather than being rewritten:
 | `hypr/hyprland.conf` | `source =` the generated file, last so it wins |
 | `foot/foot.ini` | `include=` as the first line |
 | btop | rendered theme copied to `~/.config/btop/themes/aeris.theme` |
+| Quickshell | `FileView` reads `colors.json` with `watchChanges`, so the bar repaints live |
 
 Template syntax, a trimmed version of Omarchy's:
 
