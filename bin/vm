@@ -7,6 +7,7 @@
 #   bin/vm boot --gui   boot with a virtio-gpu display, for the desktop
 #                       resolution: AERIS_VM_RES=1920x1080 bin/vm boot --gui
 #   bin/vm sync         copy this working tree to ~/aerisos in the running VM
+#   bin/vm sync --clean same, but delete the old tree first (prunes stale files)
 #   bin/vm ssh [cmd]    ssh into the running VM
 #   bin/vm hyprctl ...  run hyprctl in the guest's Hyprland session
 #   bin/vm save | reset save the VM disk as "fresh" / roll back to it
@@ -177,12 +178,25 @@ HYPRLAND_INSTANCE_SIGNATURE=\$sig hyprctl$args"
 }
 
 cmd_sync() {
+  CLEAN=0
+  [[ ${1:-} == "--clean" ]] && CLEAN=1
+
   local stage
   stage=$(mktemp -d)
   trap 'rm -rf "$stage"' RETURN
   rsync -a --exclude=/out --exclude=/.git "$ROOT/" "$stage/aerisos/"
-  ssh_vm 'rm -rf ~/aerisos'
-  scp -q -r -P "$SSH_PORT" "${SSH_OPTS[@]}" "$stage/aerisos" "$USER_NAME@localhost:"
+
+  # Copy over the top rather than deleting first. ~/.config/hypr and
+  # ~/.config/quickshell are symlinks into this tree, and removing it out
+  # from under a running Quickshell breaks its config watch — it keeps
+  # serving the old shell.qml and no amount of editing changes anything.
+  # --clean restores the delete-first behaviour when stale files matter.
+  scp -q -r -P "$SSH_PORT" "${SSH_OPTS[@]}" "$stage/aerisos" "$USER_NAME@localhost:aerisos-incoming"
+  if (( CLEAN )); then
+    ssh_vm 'rm -rf ~/aerisos && mv ~/aerisos-incoming ~/aerisos'
+  else
+    ssh_vm 'mkdir -p ~/aerisos && cp -a ~/aerisos-incoming/. ~/aerisos/ && rm -rf ~/aerisos-incoming'
+  fi
   # ~/aerisos in the guest is a copy, not a live mount, so say exactly what
   # landed there — otherwise a stale guest copy looks like a broken script.
   local rev dirty=""
@@ -206,7 +220,7 @@ cmd_snapshot() {
 case ${1:-} in
   install)    shift; cmd_install "$@" ;;
   boot)       shift; cmd_boot "$@" ;;
-  sync)       cmd_sync ;;
+  sync)       shift; cmd_sync "$@" ;;
   ssh)        shift; ssh_vm "$@" ;;
   hyprctl)    shift; cmd_hyprctl "$@" ;;
   save|reset) cmd_snapshot "$1" ;;
