@@ -132,8 +132,13 @@ the same template system as everything else.
 
 | Binding | |
 | --- | --- |
-| `Alt/Super + Space` | app launcher |
+| `Alt/Super + D` or `+ Space` | app launcher |
 | `Alt/Super + M` | `aeris-menu` — themes, capture, power |
+
+In a QEMU window on macOS, use the **Alt** (Option) variants and **D** rather
+than Space: `Cmd+Space` is Spotlight, which the host takes before the guest
+sees it, and `Option+Space` types a non-breaking space. On real hardware the
+Super bindings are the ones to use.
 
 `aeris-menu` is a page of shell over `fuzzel --dmenu`, which reads entries on
 stdin and prints the chosen one. Adding a menu is a list of labels and a `case`.
