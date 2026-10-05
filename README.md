@@ -188,6 +188,34 @@ than assumed — `Hyprland.workspaces` is an `ObjectModel` iterated through
 `.values`, `Hyprland.activeToplevel` can be null, and `Hyprland.dispatch()`
 takes the same strings `hyprctl dispatch` does.
 
+## Background
+
+```
+aeris-background list            what is available
+aeris-background set <path>      use this image
+aeris-background next            cycle
+aeris-background clear           solid theme color
+```
+
+Also in the menu under **Style > Background**. Images are looked for in
+`themes/<active>/backgrounds/`, then `~/Pictures/backgrounds/`, then the
+repo's `backgrounds/` — so a theme can carry its own wallpaper the way
+Omarchy's do.
+
+The wallpaper is a Quickshell layer-shell surface on `WlrLayer.Background`
+with `ExclusionMode.Ignore`, so it sits behind every window without reserving
+space. No `swaybg` or `hyprpaper` — the shell that draws the bar draws this
+too.
+
+The chosen path is plain text in `~/.local/state/aerisos/current/background`.
+Omarchy uses a symlink there and polls it; a text file is watchable by
+`FileView`, so the wallpaper changes the instant the command runs.
+
+**No wallpapers ship with AerisOS.** Omarchy's were not copied — they are
+images with their own provenance, and the MIT license covers their code, not
+every asset in the repository. With none present the desktop shows the theme's
+background color, which is a finished state rather than a broken one.
+
 ## Theming
 
 Palettes are Omarchy's, taken as data under its MIT license (see

@@ -15,10 +15,11 @@ share=/usr/local/share/aerisos
 
 install -Dm0755 "$AERIS_ROOT/bin/aeris-theme" /usr/local/bin/aeris-theme
 install -Dm0755 "$AERIS_ROOT/bin/aeris-menu"  /usr/local/bin/aeris-menu
+install -Dm0755 "$AERIS_ROOT/bin/aeris-background" /usr/local/bin/aeris-background
 
 rm -rf "$share"
 install -d "$share"
-cp -r "$AERIS_ROOT/themes" "$AERIS_ROOT/themed" "$share/"
+cp -r "$AERIS_ROOT/themes" "$AERIS_ROOT/themed" "$AERIS_ROOT/backgrounds" "$share/"
 
 count=$(find "$share/themes" -name colors.toml | wc -l | tr -d ' ')
 echo "  installed aeris-theme with $count palettes"

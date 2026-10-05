@@ -1,0 +1,100 @@
+#!/bin/bash
+# aeris-background — choose the wallpaper.
+#
+#   aeris-background list             what is available
+#   aeris-background set <path>       use this image
+#   aeris-background next             cycle to the next one
+#   aeris-background clear            solid theme color instead
+#   aeris-background current          print the active path
+#
+# Images are looked for in, in order:
+#   themes/<active-theme>/backgrounds/   per-theme, like Omarchy's
+#   ~/Pictures/backgrounds/              yours
+#   <repo>/backgrounds/                  shipped with AerisOS
+#
+# The choice is written as plain text to ~/.local/state/aerisos/current/
+# background. Omarchy uses a symlink there, which works because their shell
+# polls it; a text file is watchable by Quickshell's FileView instead, so the
+# wallpaper changes the moment this runs rather than on the next poll.
+set -euo pipefail
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/aerisos"
+CURRENT="$STATE/current"
+MARKER="$CURRENT/background"
+
+die() { echo "aeris-background: $*" >&2; exit 1; }
+
+resolve_root() {
+  local self candidate
+  self=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+  for candidate in "${AERIS_ROOT:-}" /usr/local/share/aerisos "$self"; do
+    [[ -n $candidate && -d $candidate/themes ]] || continue
+    printf '%s' "$candidate"
+    return 0
+  done
+  return 1
+}
+AERIS_ROOT=$(resolve_root) || die "cannot find the AerisOS data; set AERIS_ROOT"
+
+search_dirs() {
+  local theme
+  theme=$(cat "$CURRENT/theme" 2>/dev/null || true)
+  [[ -n $theme ]] && printf '%s\n' "$AERIS_ROOT/themes/$theme/backgrounds"
+  printf '%s\n' "$HOME/Pictures/backgrounds"
+  printf '%s\n' "$AERIS_ROOT/backgrounds"
+}
+
+cmd_list() {
+  local dir
+  while IFS= read -r dir; do
+    [[ -d $dir ]] || continue
+    find "$dir" -maxdepth 1 -type f \
+      \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+      2>/dev/null
+  done < <(search_dirs) | sort -u
+}
+
+cmd_current() {
+  [[ -s $MARKER ]] || { echo "none (solid theme color)"; return 0; }
+  cat "$MARKER"
+}
+
+cmd_set() {
+  local path=${1:-}
+  [[ -n $path ]] || die "usage: aeris-background set <path>"
+  path=$(readlink -f "$path") || die "cannot resolve: $path"
+  [[ -f $path ]] || die "no such file: $path"
+
+  mkdir -p "$CURRENT"
+  printf '%s\n' "$path" >"$MARKER"
+  echo "background: $path"
+}
+
+cmd_clear() {
+  mkdir -p "$CURRENT"
+  : >"$MARKER"
+  echo "background cleared — solid theme color"
+}
+
+cmd_next() {
+  local -a all
+  mapfile -t all < <(cmd_list)
+  (( ${#all[@]} )) || die "no images found; put some in ~/Pictures/backgrounds"
+
+  local cur idx=-1 i
+  cur=$(cat "$MARKER" 2>/dev/null || true)
+  for i in "${!all[@]}"; do
+    [[ ${all[i]} == "$cur" ]] && { idx=$i; break; }
+  done
+
+  cmd_set "${all[$(( (idx + 1) % ${#all[@]} ))]}"
+}
+
+case ${1:-} in
+  list)    cmd_list ;;
+  current) cmd_current ;;
+  set)     shift; cmd_set "$@" ;;
+  next)    cmd_next ;;
+  clear)   cmd_clear ;;
+  *)       sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

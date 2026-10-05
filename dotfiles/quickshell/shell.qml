@@ -17,9 +17,86 @@
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Wayland
 import QtQuick
 
 ShellRoot {
+  // Defaults double as the fallback: if colors.json is missing the bar
+  // still renders legibly instead of black-on-black.
+  QtObject {
+    id: theme
+
+    property color background: "#161b23"
+    property color foreground: "#e3e9ef"
+    property color accent: "#79b0e4"
+    property color muted: "#475363"
+    property color selection: "#223044"
+    property color urgent: "#d9a55e"
+
+    function apply(json) {
+      try {
+        const c = JSON.parse(json);
+        if (c.background) theme.background = c.background;
+        if (c.foreground) theme.foreground = c.foreground;
+        if (c.accent) theme.accent = c.accent;
+        if (c.muted) theme.muted = c.muted;
+        if (c.selection) theme.selection = c.selection;
+        if (c.red) theme.urgent = c.red;
+      } catch (e) {
+        console.warn("aeris: colors.json did not parse:", e);
+      }
+    }
+  }
+
+  // --- wallpaper -----------------------------------------------------------
+  //
+  // A layer-shell surface on the Background layer, so it sits behind every
+  // window. ExclusionMode.Ignore keeps it from reserving screen space the way
+  // the bar does.
+  //
+  // The path comes from ~/.local/state/aerisos/current/background, written as
+  // plain text by `aeris-background`. An empty file means "no image", and the
+  // solid theme color shows through — which is also what happens before you
+  // have put any wallpapers on the machine.
+  PanelWindow {
+    id: wallpaper
+
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
+
+    WlrLayershell.layer: WlrLayer.Background
+    exclusionMode: ExclusionMode.Ignore
+    color: theme.background
+
+    property string imagePath: ""
+
+    FileView {
+      id: backgroundFile
+
+      path: Quickshell.env("HOME") + "/.local/state/aerisos/current/background"
+      blockLoading: true
+      watchChanges: true
+      printErrors: false
+
+      onLoaded: wallpaper.imagePath = backgroundFile.text().trim()
+      onFileChanged: backgroundFile.reload()
+      onLoadFailed: wallpaper.imagePath = ""
+    }
+
+    Image {
+      anchors.fill: parent
+      source: wallpaper.imagePath ? "file://" + wallpaper.imagePath : ""
+      visible: status === Image.Ready
+      fillMode: Image.PreserveAspectCrop
+      asynchronous: true
+      cache: false
+    }
+  }
+
   PanelWindow {
     id: bar
 
@@ -31,33 +108,6 @@ ShellRoot {
 
     implicitHeight: 30
     color: theme.background
-
-    // Defaults double as the fallback: if colors.json is missing the bar
-    // still renders legibly instead of black-on-black.
-    QtObject {
-      id: theme
-
-      property color background: "#161b23"
-      property color foreground: "#e3e9ef"
-      property color accent: "#79b0e4"
-      property color muted: "#475363"
-      property color selection: "#223044"
-      property color urgent: "#d9a55e"
-
-      function apply(json) {
-        try {
-          const c = JSON.parse(json);
-          if (c.background) theme.background = c.background;
-          if (c.foreground) theme.foreground = c.foreground;
-          if (c.accent) theme.accent = c.accent;
-          if (c.muted) theme.muted = c.muted;
-          if (c.selection) theme.selection = c.selection;
-          if (c.red) theme.urgent = c.red;
-        } catch (e) {
-          console.warn("aeris: colors.json did not parse:", e);
-        }
-      }
-    }
 
     FileView {
       id: colorsFile

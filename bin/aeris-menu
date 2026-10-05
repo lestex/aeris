@@ -48,11 +48,23 @@ menu_theme() {
   aeris-theme set "$choice"
 }
 
+menu_background() {
+  local choice path
+  choice=$({ aeris-background list | sed "s|$HOME/|~/|"; echo "Next"; echo "None (theme color)"; } | pick "background")
+  case $choice in
+    "")                  return 0 ;;
+    Next)                aeris-background next ;;
+    "None (theme color)") aeris-background clear ;;
+    *)                   path=${choice/#\~\//$HOME/}; aeris-background set "$path" ;;
+  esac
+}
+
 menu_style() {
-  case $(printf '%s\n' Theme Font | pick "style") in
-    Theme) menu_theme ;;
-    Font)  run_term "${EDITOR:-vim}" "$HOME/aerisos/dotfiles/hypr/hyprland.conf" ;;
-    *)     return 0 ;;
+  case $(printf '%s\n' Theme Background Font | pick "style") in
+    Theme)      menu_theme ;;
+    Background) menu_background ;;
+    Font)       run_term "${EDITOR:-vim}" "$HOME/aerisos/dotfiles/hypr/hyprland.conf" ;;
+    *)          return 0 ;;
   esac
 }
 
@@ -168,7 +180,8 @@ menu_root() {
 }
 
 case ${1:-} in
-  style)   menu_style ;;
+  style)      menu_style ;;
+  background) menu_background ;;
   theme)   menu_theme ;;
   trigger) menu_trigger ;;
   capture) menu_capture ;;
