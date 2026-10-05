@@ -176,7 +176,11 @@ reload() {
   # the script — intermittently, depending on what happens to be running.
   local term running
   for term in foot ghostty; do
-    running=$(pgrep -x "$term" 2>/dev/null | wc -l | tr -d " ")
+    # pgrep exits 1 with no match, and `pipefail` would carry that out of a
+    # `| wc -l` pipeline straight into `set -e`. Count with -c and swallow
+    # the status instead of piping.
+    running=$(pgrep -cx "$term" 2>/dev/null || true)
+    running=${running:-0}
     if (( running > 0 )); then
       echo "  $running $term window(s) keep the old colours — open a new one"
     fi
