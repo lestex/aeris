@@ -220,9 +220,17 @@ cmd_backgrounds() {
     return 1
   fi
   echo "pushing $n images ($(du -shc "$ROOT"/themes/*/backgrounds 2>/dev/null | tail -1 | cut -f1))..."
-  rsync -a -e "ssh -p $SSH_PORT ${SSH_OPTS[*]}" \
-    --include='*/' --include='backgrounds/***' --exclude='*' \
-    "$ROOT/themes/" "$USER_NAME@localhost:aerisos/themes/"
+
+  # tar over ssh, not rsync: the guest is a minimal Fedora built with
+  # --exclude-weakdeps and has no rsync, while tar is in @core. No -z either,
+  # since webp and jpg are already compressed.
+  #
+  # Plain ssh rather than ssh_vm here — that passes -t for an interactive tty,
+  # which would corrupt a binary stream.
+  ( cd "$ROOT/themes" && tar -cf - */backgrounds ) \
+    | ssh -p "$SSH_PORT" "${SSH_OPTS[@]}" "$USER_NAME@localhost" \
+        'mkdir -p ~/aerisos/themes && tar -C ~/aerisos/themes -xf -'
+
   echo "done"
 }
 
