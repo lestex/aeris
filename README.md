@@ -166,6 +166,28 @@ build in the COPR that ships walker — so walker would launch and find nothing.
 Omarchy itself replaced walker with a 1,480-line Quickshell menu; this does the
 same job in a page of shell because it only has to serve one person.
 
+## The bar
+
+Quickshell, laid out like Omarchy's: menu and workspaces left, clock centre,
+active window right.
+
+| | |
+| --- | --- |
+| **AerisOS** (left) | click opens `aeris-menu` |
+| Workspaces | click to switch; focused filled with the accent, urgent in red |
+| Clock | centre |
+| Active window | right, elided, capped at half the bar |
+
+`dotfiles/quickshell/shell.qml`, ~190 lines. Omarchy's bar is 2,076 lines of
+`Bar.qml` plus fourteen widget files and a JSON layout schema, because theirs
+is drag-to-reorder, multi-monitor, plugin-hosted and configured from a file
+other people edit.
+
+Every Hyprland property it uses was checked against Quickshell's source rather
+than assumed — `Hyprland.workspaces` is an `ObjectModel` iterated through
+`.values`, `Hyprland.activeToplevel` can be null, and `Hyprland.dispatch()`
+takes the same strings `hyprctl dispatch` does.
+
 ## Theming
 
 Palettes are Omarchy's, taken as data under its MIT licence (see

@@ -1,15 +1,22 @@
 //
-// AerisOS — themed Quickshell bar.
+// AerisOS bar.
 //
-// Colours come from ~/.local/state/aerisos/current/colors.json, written by
-// `aeris-theme set`. FileView watches the file, so switching themes repaints
-// the bar with no restart.
+// Layout follows Omarchy's: menu and workspaces left, clock centre, active
+// window right. Colours come from ~/.local/state/aerisos/current/colors.json,
+// written by `aeris-theme set`; FileView watches it so a theme switch
+// repaints without a restart.
 //
-// Quickshell looks for ~/.config/quickshell/shell.qml by default, which is
-// where setup.d/60-dotfiles.sh symlinks this.
+// Every Hyprland property used here was checked against Quickshell's source
+// rather than assumed:
+//   Hyprland.workspaces      ObjectModel, iterate .values
+//   workspace.id/.focused/.urgent
+//   Hyprland.activeToplevel  may be null; .title
+//   Hyprland.dispatch(cmd)   for click-to-switch
+//   Quickshell.execDetached([...])
 //
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 
 ShellRoot {
@@ -25,9 +32,8 @@ ShellRoot {
     implicitHeight: 30
     color: theme.background
 
-    // The defaults double as the fallback. If colors.json is missing or
-    // unparseable the bar still renders legibly, rather than coming up
-    // black-on-black or not at all.
+    // Defaults double as the fallback: if colors.json is missing the bar
+    // still renders legibly instead of black-on-black.
     QtObject {
       id: theme
 
@@ -35,6 +41,8 @@ ShellRoot {
       property color foreground: "#e3e9ef"
       property color accent: "#79b0e4"
       property color muted: "#475363"
+      property color selection: "#223044"
+      property color urgent: "#d9a55e"
 
       function apply(json) {
         try {
@@ -43,6 +51,8 @@ ShellRoot {
           if (c.foreground) theme.foreground = c.foreground;
           if (c.accent) theme.accent = c.accent;
           if (c.muted) theme.muted = c.muted;
+          if (c.selection) theme.selection = c.selection;
+          if (c.red) theme.urgent = c.red;
         } catch (e) {
           console.warn("aeris: colors.json did not parse:", e);
         }
@@ -53,18 +63,14 @@ ShellRoot {
       id: colorsFile
 
       path: Quickshell.env("HOME") + "/.local/state/aerisos/current/colors.json"
-
-      // Read synchronously at startup so the bar never flashes its defaults,
-      // then follow the file for later `aeris-theme set` runs.
       blockLoading: true
       watchChanges: true
 
       onLoaded: theme.apply(colorsFile.text())
       onFileChanged: colorsFile.reload()
-      onLoadFailed: console.warn("aeris: no readable colors.json; using built-in defaults")
+      onLoadFailed: console.warn("aeris: no readable colors.json; using defaults")
     }
 
-    // Accent hairline along the bottom.
     Rectangle {
       anchors.bottom: parent.bottom
       width: parent.width
@@ -72,16 +78,79 @@ ShellRoot {
       color: theme.accent
     }
 
-    Text {
-      anchors.verticalCenter: parent.verticalCenter
+    // --- left: menu button + workspaces -------------------------------------
+
+    Row {
+      id: left
+
       anchors.left: parent.left
-      anchors.leftMargin: 12
-      text: "AerisOS"
-      color: theme.accent
-      font.family: "JetBrains Mono"
-      font.pixelSize: 12
-      font.bold: true
+      anchors.leftMargin: 10
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 10
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "AerisOS"
+        color: menuMouse.containsMouse ? theme.foreground : theme.accent
+        font.family: "JetBrains Mono"
+        font.pixelSize: 12
+        font.bold: true
+
+        MouseArea {
+          id: menuMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: Quickshell.execDetached(["aeris-menu"])
+        }
+      }
+
+      Row {
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 4
+
+        Repeater {
+          // .values is a plain list, so it can be sorted; the model's own
+          // order is not guaranteed to be by id.
+          model: {
+            const ws = Hyprland.workspaces.values.slice();
+            ws.sort((a, b) => a.id - b.id);
+            return ws;
+          }
+
+          delegate: Rectangle {
+            required property var modelData
+
+            width: Math.max(20, label.implicitWidth + 12)
+            height: 18
+            radius: 4
+            color: modelData.focused ? theme.accent
+                 : modelData.urgent ? theme.urgent
+                 : wsMouse.containsMouse ? theme.selection
+                 : "transparent"
+
+            Text {
+              id: label
+              anchors.centerIn: parent
+              text: modelData.name
+              color: modelData.focused ? theme.background : theme.foreground
+              font.family: "JetBrains Mono"
+              font.pixelSize: 11
+            }
+
+            MouseArea {
+              id: wsMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: Hyprland.dispatch("workspace " + modelData.id)
+            }
+          }
+        }
+      }
     }
+
+    // --- centre: clock ------------------------------------------------------
 
     Text {
       id: clock
@@ -105,12 +174,18 @@ ShellRoot {
       }
     }
 
+    // --- right: active window ------------------------------------------------
+
     Text {
-      anchors.verticalCenter: parent.verticalCenter
       anchors.right: parent.right
       anchors.rightMargin: 12
-      text: colorsFile.loaded ? "" : "no theme"
+      anchors.verticalCenter: parent.verticalCenter
+      // Keep clear of the clock on a narrow screen.
+      width: Math.min(implicitWidth, bar.width / 2 - 120)
+
+      text: Hyprland.activeToplevel ? Hyprland.activeToplevel.title : ""
       color: theme.muted
+      elide: Text.ElideRight
       font.family: "JetBrains Mono"
       font.pixelSize: 11
     }
