@@ -231,7 +231,9 @@ cmd_backgrounds() {
   # which `setup 70` does not wipe. COPYFILE_DISABLE and the ._* exclude stop
   # macOS tar emitting AppleDouble sidecars that the guest would unpack as
   # junk files sitting next to every image.
-  ( cd "$ROOT/themes" && COPYFILE_DISABLE=1 tar --exclude='._*' -cf - */backgrounds ) \
+  # --no-xattrs stops macOS tar attaching com.apple.provenance to every file,
+  # which the guest's tar then reports as an unknown header for each one.
+  ( cd "$ROOT/themes" && COPYFILE_DISABLE=1 tar --no-xattrs --exclude='._*' -cf - */backgrounds ) \
     | ssh -p "$SSH_PORT" "${SSH_OPTS[@]}" "$USER_NAME@localhost" \
         'd=${XDG_DATA_HOME:-$HOME/.local/share}/aerisos; mkdir -p "$d" && tar -C "$d" -xmf -'
 
