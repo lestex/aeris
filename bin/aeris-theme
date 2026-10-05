@@ -13,6 +13,9 @@
 #   {{ key }}        "#1a1b26"
 #   {{ key_strip }}  "1a1b26"    — for configs that reject the leading #
 #   {{ key_rgb }}    "26,27,38"
+#
+# Requires bash 4+ for associative arrays. Fedora ships bash 5; macOS ships
+# 3.2, so when testing from a checkout on a Mac use brew's bash, not /bin/bash.
 set -euo pipefail
 
 # Where themes/ and themed/ live, in order:
