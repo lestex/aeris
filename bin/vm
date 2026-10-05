@@ -1,0 +1,139 @@
+#!/bin/bash
+# Test AerisOS in a QEMU VM on an Apple Silicon Mac (aarch64, hvf).
+#
+#   bin/vm install <fedora-everything-netinst-aarch64.iso>
+#                       wipe the VM disk, install unattended from ks/install.ks
+#   bin/vm boot         boot the installed VM (serial console in this terminal)
+#   bin/vm sync         copy this working tree to ~/aerisos in the running VM
+#   bin/vm ssh [cmd]    ssh into the running VM
+#   bin/vm save | reset save the VM disk as "fresh" / roll back to it
+#
+# Quit the console with Ctrl-A then X. VM logins: user password "test",
+# LUKS passphrase "testtest" — throwaway values, the real ones stay in ks/.
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+OUT="$ROOT/out"
+DISK="$OUT/aeris.qcow2"
+VARS="$OUT/vars.fd"
+OEMDRV="$OUT/oemdrv.dmg"
+SSH_PORT=2222
+USER_NAME=$(awk '/^user /{for (i=1; i<=NF; i++) if ($i ~ /^--name=/) print substr($i, 8)}' "$ROOT/ks/install.ks")
+
+command -v qemu-system-aarch64 >/dev/null || { echo "qemu not found — brew install qemu" >&2; exit 1; }
+FIRMWARE="$(dirname "$(command -v qemu-system-aarch64)")/../share/qemu"
+
+qemu() {
+  qemu-system-aarch64 -machine virt -accel hvf -cpu host -smp 4 -m 4096 \
+    -drive if=pflash,format=raw,readonly=on,file="$FIRMWARE/edk2-aarch64-code.fd" \
+    -drive if=pflash,format=raw,file="$VARS" \
+    -drive if=virtio,file="$DISK" \
+    -nographic \
+    -nic user,model=virtio-net-pci,hostfwd=tcp::$SSH_PORT-:22 \
+    "$@"
+}
+
+ssh_vm() {
+  ssh -t -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR "$USER_NAME@localhost" "$@"
+}
+
+# The real kickstart with VM values: virtio disk, test credentials, and a
+# serial console so the LUKS prompt shows up in this terminal.
+make_ks() {
+  sed -e 's/nvme0n1/vda/g' \
+      -e "s|REPLACE_WITH_OPENSSL_PASSWD_6|$(openssl passwd -6 test)|" \
+      -e 's/REPLACE_ME/testtest/' \
+      -e 's/^bootloader --append="\([^"]*\)"/bootloader --append="\1 console=ttyAMA0"/' \
+      "$ROOT/ks/install.ks" > "$OUT/ks.cfg"
+}
+
+# A small FAT disk labelled OEMDRV holding ks.cfg — the same route as the
+# second USB stick on real hardware.
+make_oemdrv() {
+  rm -f "$OEMDRV"
+  hdiutil create -quiet -size 8m -fs "MS-DOS FAT12" -volname OEMDRV -layout NONE \
+    -o "${OEMDRV%.dmg}" 2>/dev/null
+  local mp
+  mp=$(hdiutil attach "$OEMDRV" 2>/dev/null | awk -F'\t' '/OEMDRV/{print $NF}')
+  cp "$OUT/ks.cfg" "$mp/ks.cfg"
+  hdiutil detach -quiet "$mp" 2>/dev/null
+}
+
+cmd_install() {
+  local iso=${1:?usage: bin/vm install <fedora-everything-netinst-aarch64.iso>}
+  [[ -f $iso ]] || { echo "not a file: $iso" >&2; exit 1; }
+  if pgrep -f "qemu-system-aarch64.*$DISK" >/dev/null; then
+    echo "the VM is running — quit it first (Ctrl-A X)" >&2; exit 1
+  fi
+
+  mkdir -p "$OUT"
+  make_ks
+  if [[ -x $OUT/venv/bin/ksvalidator ]] || \
+     { python3 -m venv "$OUT/venv" && "$OUT/venv/bin/pip" -q install pykickstart requests; } &>/dev/null; then
+    "$OUT/venv/bin/ksvalidator" "$OUT/ks.cfg"
+  else
+    echo "warning: could not install pykickstart, skipping validation" >&2
+  fi
+  make_oemdrv
+
+  # Boot the installer kernel directly so the console and kickstart options
+  # need no hand-editing in GRUB.
+  local boot="$OUT/iso"
+  rm -rf "$boot" && mkdir -p "$boot"
+  tar -xf "$iso" -C "$boot" images/pxeboot/vmlinuz images/pxeboot/initrd.img EFI/BOOT/grub.cfg
+  local stage2
+  stage2=$(grep -o 'inst.stage2=[^ ]*' "$boot/EFI/BOOT/grub.cfg" | head -1)
+
+  rm -f "$DISK"
+  qemu-img create -q -f qcow2 "$DISK" 40G
+  cp "$FIRMWARE/edk2-arm-vars.fd" "$VARS"
+
+  # -no-reboot: the kickstart ends in `reboot`, which would otherwise loop
+  # straight back into the installer kernel and wipe the disk again.
+  qemu -no-reboot \
+    -drive if=virtio,format=raw,readonly=on,file="$OEMDRV" \
+    -device virtio-scsi-pci \
+    -drive if=none,id=cd,media=cdrom,readonly=on,file="$iso" -device scsi-cd,drive=cd \
+    -kernel "$boot/images/pxeboot/vmlinuz" -initrd "$boot/images/pxeboot/initrd.img" \
+    -append "$stage2 inst.ks=hd:LABEL=OEMDRV:/ks.cfg console=ttyAMA0"
+
+  echo
+  echo "Install finished. Next: bin/vm boot, check it, sudo poweroff, then bin/vm save"
+}
+
+cmd_boot() {
+  [[ -f $DISK ]] || { echo "no VM disk — run bin/vm install first" >&2; exit 1; }
+  qemu
+}
+
+cmd_sync() {
+  local stage
+  stage=$(mktemp -d)
+  trap 'rm -rf "$stage"' RETURN
+  rsync -a --exclude=/out --exclude=/.git "$ROOT/" "$stage/aerisos/"
+  ssh_vm 'rm -rf ~/aerisos'
+  scp -q -r -P "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR "$stage/aerisos" "$USER_NAME@localhost:"
+  echo "synced to ~/aerisos — try: bin/vm ssh 'cd aerisos && sudo ./setup'"
+}
+
+cmd_snapshot() {
+  if pgrep -f "qemu-system-aarch64.*$DISK" >/dev/null; then
+    echo "shut the VM down first (sudo poweroff inside it)" >&2; exit 1
+  fi
+  case $1 in
+    save)  qemu-img snapshot -d fresh "$DISK" 2>/dev/null || true
+           qemu-img snapshot -c fresh "$DISK" && echo "saved as 'fresh'" ;;
+    reset) qemu-img snapshot -a fresh "$DISK" && echo "reset to 'fresh'" ;;
+  esac
+}
+
+case ${1:-} in
+  install)    shift; cmd_install "$@" ;;
+  boot)       cmd_boot ;;
+  sync)       cmd_sync ;;
+  ssh)        shift; ssh_vm "$@" ;;
+  save|reset) cmd_snapshot "$1" ;;
+  *)          sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

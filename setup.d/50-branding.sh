@@ -2,7 +2,7 @@
 # The name, in the two places it shows up.
 #
 # ID stays "fedora" on purpose: dnf, COPRs and $releasever resolution all key
-# off it, so renaming it breaks package resolution. Only the display strings
+# off it, so renaming it breaks package resolution. Only display strings
 # change — the same split Omarchy uses for TARGET_OS_NAME.
 set -euo pipefail
 
@@ -18,9 +18,21 @@ sed -E \
 mv -f /etc/os-release.new /etc/os-release
 chmod 0644 /etc/os-release
 
-# GRUB menu title
+# GRUB menu title. Fedora's grub.cfg lives in a different place depending on
+# firmware and release, so resolve it through the symlinks Fedora ships
+# rather than hardcoding a path.
 if ! grep -qx "GRUB_DISTRIBUTOR=\"$NAME\"" /etc/default/grub; then
   sed -i -E "/^GRUB_DISTRIBUTOR=/d" /etc/default/grub
   echo "GRUB_DISTRIBUTOR=\"$NAME\"" >> /etc/default/grub
-  grub2-mkconfig -o /boot/grub2/grub.cfg
+
+  if [[ -e /etc/grub2-efi.cfg ]]; then
+    cfg=$(readlink -f /etc/grub2-efi.cfg)
+  elif [[ -e /etc/grub2.cfg ]]; then
+    cfg=$(readlink -f /etc/grub2.cfg)
+  else
+    cfg=/boot/grub2/grub.cfg
+  fi
+
+  grub2-mkconfig -o "$cfg"
+  echo "  wrote $cfg"
 fi

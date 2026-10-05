@@ -22,8 +22,8 @@ clearpart --all --initlabel --drives=nvme0n1
 
 part /boot/efi --fstype=efi   --size=1024 --ondisk=nvme0n1
 part /boot     --fstype=ext4  --size=1024 --ondisk=nvme0n1
-part btrfs.01  --fstype=btrfs --grow       --ondisk=nvme0n1 \
-     --encrypted --luks-version=luks2 --passphrase=REPLACE_ME
+# One line: kickstart has no backslash continuations.
+part btrfs.01  --fstype=btrfs --grow       --ondisk=nvme0n1 --encrypted --luks-version=luks2 --passphrase=REPLACE_ME
 
 btrfs none --label=aeris btrfs.01
 btrfs /           --subvol --name=root      LABEL=aeris

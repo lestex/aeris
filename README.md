@@ -43,7 +43,7 @@ passphrase, and the password hash (`openssl passwd -6`).
 ### From a Linux host
 
 ```
-./bin/make-iso ~/Downloads/Fedora-Everything-netinst-x86_64-42-1.1.iso
+./bin/make-iso ~/Downloads/Fedora-Everything-netinst-x86_64-43-1.1.iso
 ```
 
 ## After first boot
@@ -104,6 +104,26 @@ dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 
 Phases 1 and 2 have nothing to do with the desktop, and they are the ones that
 can waste a weekend. Do them first, boringly.
+
+## Dev VM vs target machine
+
+`bin/vm` runs an **aarch64** guest (native `hvf` on Apple Silicon, so it is
+fast). The target machine is **x86_64**. Most steps are arch-independent, but
+these are not:
+
+| Thing | aarch64 VM | x86_64 target |
+| --- | --- | --- |
+| `quickshell` COPR | builds | builds |
+| `grub-btrfs` COPR | **no build** — step skips itself | builds |
+| Snapshot entries in GRUB | **cannot be tested here** | the real test |
+| `microcode_ctl` | n/a, skipped | installed by `30-hardware.sh` |
+| Serial console | `console=ttyAMA0`, injected by `bin/vm` | not set |
+
+So the VM validates the kickstart, snapper, the dnf snapshot hook, branding,
+the desktop stack and dotfiles. The one thing it cannot validate is the
+bootable-snapshot menu — verify that on the real machine before you trust it.
+
+Neither COPR carries Fedora 42 any more; use 43 or later.
 
 ## Two things to verify before trusting metal
 

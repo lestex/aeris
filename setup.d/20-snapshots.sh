@@ -1,8 +1,12 @@
 #!/bin/bash
 # Snapper + per-transaction snapshots + bootable snapshot entries.
 #
-# This is the load-bearing step. Do not move past it until you have
-# actually rolled back once — see the "Verify" section of the README.
+# This is the load-bearing step. Do not consider it done until you have
+# actually rolled back once — see "Verify the rollback" in the README.
+#
+# Everything except grub-btrfs is arch-independent, so the aarch64 VM still
+# exercises snapper and the dnf hook. The GRUB submenu is x86_64-only and
+# must be verified on the real machine.
 set -euo pipefail
 
 dnf -y install --setopt=install_weak_deps=False \
@@ -25,7 +29,12 @@ snapper -c root set-config \
 install -Dm0644 "$AERIS_ROOT/etc/dnf/libdnf5-plugins/actions.d/snapper.actions" \
   /etc/dnf/libdnf5-plugins/actions.d/snapper.actions
 
-dnf -y install grub-btrfs
-
 systemctl enable --now snapper-cleanup.timer
-systemctl enable --now grub-btrfsd
+
+# Snapshot entries in the boot menu — x86_64 only, see 10-repos.sh.
+if [[ $(uname -m) == "x86_64" ]]; then
+  dnf -y install grub-btrfs
+  systemctl enable --now grub-btrfsd
+else
+  echo "  skipping grub-btrfs: no $(uname -m) build — boot-menu entries UNVERIFIED on this host"
+fi
