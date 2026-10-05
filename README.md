@@ -141,10 +141,13 @@ aeris-theme current
 `themed/*.tpl` are rendered into `~/.local/state/aerisos/current/`, and each
 config *includes* its generated file rather than being rewritten:
 
-| Config | How it picks the theme up |
-| --- | --- |
-| `hypr/hyprland.conf` | `source =` the generated file, last so it wins |
-| `foot/foot.ini` | `include=` as the first line; section must be `[colors-dark]` |
+| Config | How it picks the theme up | Reload |
+| --- | --- | --- |
+| `hypr/hyprland.conf` | `source =` the generated file, last so it wins | `hyprctl reload` |
+| `foot/foot.ini` | `include=` first line; section must be `[colors-dark]` | none — new window |
+| `alacritty/alacritty.toml` | `[general] import = [...]` | automatic |
+| `kitty/kitty.conf` | `include ${HOME}/...` — kitty expands env vars, not `~` | `SIGUSR1` |
+| `ghostty/config` | `config-file =` | none — new window |
 | btop | rendered theme copied to `~/.config/btop/themes/aeris.theme` |
 | Quickshell | `FileView` reads `colors.json` with `watchChanges`, so the bar repaints live |
 
@@ -162,6 +165,14 @@ config, where it would fail far from its cause. Use only the keys listed in
 `themes/README.md`; all 22 palettes define them.
 
 For btop, set `color_theme = "aeris"` in its config once.
+
+**ghostty is not in Fedora.** `foot`, `alacritty` and `kitty` all are. For
+ghostty, pick a COPR yourself — several carry f43–f45 on both architectures
+(`cube1ber/ghostty`, `myriad-sun/ghostty`, `boydkelly/ghostty-tip`), but
+unlike the Hyprland COPR there is no obvious community default, so check one
+before depending on it. The template and config are shipped either way, and
+`dotfiles/ghostty/` contains both `config` and `config.ghostty` because
+released and newer builds look for different filenames.
 
 **foot does not reload.** It has no reload signal: `SIGUSR1`/`SIGUSR2` switch
 between the `[colors-dark]` and `[colors-light]` sections of the already-loaded

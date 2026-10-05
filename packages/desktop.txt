@@ -13,7 +13,11 @@ qt6-qtimageformats
 qt6-qtmultimedia
 qt6-qt5compat
 
+# Terminals. foot, alacritty and kitty are all in Fedora proper; ghostty is
+# not and needs a COPR you pick yourself — see the README.
 foot
+alacritty
+kitty
 wl-clipboard
 grim
 slurp

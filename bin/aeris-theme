@@ -159,15 +159,28 @@ reload() {
     hyprctl reload >/dev/null && echo "  hyprland reloaded"
   fi
 
-  # foot cannot be reloaded. It has no reload signal — SIGUSR1/SIGUSR2 switch
-  # between the [colors-dark] and [colors-light] sections of the config it
-  # already loaded, they do not re-read the file. Running windows keep their
-  # colours; new ones pick up the theme.
-  local running
-  running=$(pgrep -x foot 2>/dev/null | wc -l | tr -d " ")
-  if (( running > 0 )); then
-    echo "  $running foot window(s) keep the old colours — foot has no reload; open a new one"
+  # kitty reloads its config on SIGUSR1.
+  if pgrep -x kitty >/dev/null 2>&1; then
+    pkill -USR1 -x kitty && echo "  kitty reloaded"
   fi
+
+  # alacritty needs nothing: live_config_reload defaults to true and it
+  # follows imported files.
+
+  # foot and ghostty cannot be reloaded in place. foot has no reload signal at
+  # all — SIGUSR1/SIGUSR2 switch between the [colors-dark] and [colors-light]
+  # sections of the config it already loaded rather than re-reading the file.
+  # Running windows keep their colours; new ones pick up the theme.
+  # Note the full `if`: under `set -e`, a bare `(( n > 0 )) && echo` returns 1
+  # when the test is false, and as the last command in the loop that aborts
+  # the script — intermittently, depending on what happens to be running.
+  local term running
+  for term in foot ghostty; do
+    running=$(pgrep -x "$term" 2>/dev/null | wc -l | tr -d " ")
+    if (( running > 0 )); then
+      echo "  $running $term window(s) keep the old colours — open a new one"
+    fi
+  done
 
   # Quickshell watches its own config and the files it reads; nothing to do.
 }
