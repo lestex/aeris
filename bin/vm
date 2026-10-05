@@ -4,6 +4,7 @@
 #   bin/vm install <fedora-everything-netinst-aarch64.iso>
 #                       wipe the VM disk, install unattended from ks/install.ks
 #   bin/vm boot         boot the installed VM (serial console in this terminal)
+#   bin/vm boot --gui   boot with a virtio-gpu display, for the desktop
 #   bin/vm sync         copy this working tree to ~/aerisos in the running VM
 #   bin/vm ssh [cmd]    ssh into the running VM
 #   bin/vm save | reset save the VM disk as "fresh" / roll back to it
@@ -18,6 +19,8 @@ DISK="$OUT/aeris.qcow2"
 VARS="$OUT/vars.fd"
 OEMDRV="$OUT/oemdrv.dmg"
 SSH_PORT=2222
+GUI=0
+MEM=${AERIS_VM_MEM:-4096}
 SSH_OPTS=(
   -o StrictHostKeyChecking=no
   -o UserKnownHostsFile=/dev/null
@@ -32,11 +35,24 @@ command -v qemu-system-aarch64 >/dev/null || { echo "qemu not found — brew ins
 FIRMWARE="$(dirname "$(command -v qemu-system-aarch64)")/../share/qemu"
 
 qemu() {
-  qemu-system-aarch64 -machine virt -accel hvf -cpu host -smp 4 -m 4096 \
+  # Headless by default. --gui adds a virtio-gpu so a compositor has a DRM
+  # device to render to, plus USB input (the virt machine has no PS/2), and
+  # keeps the serial console on stdio so boot messages stay visible.
+  local out=(-nographic)
+  if (( GUI )); then
+    out=(
+      -device virtio-gpu-pci
+      -device qemu-xhci -device usb-kbd -device usb-tablet
+      -display cocoa
+      -serial mon:stdio
+    )
+  fi
+
+  qemu-system-aarch64 -machine virt -accel hvf -cpu host -smp 4 -m "$MEM" \
     -drive if=pflash,format=raw,readonly=on,file="$FIRMWARE/edk2-aarch64-code.fd" \
     -drive if=pflash,format=raw,file="$VARS" \
     -drive if=virtio,file="$DISK" \
-    -nographic \
+    "${out[@]}" \
     -nic user,model=virtio-net-pci,hostfwd=tcp::$SSH_PORT-:22 \
     "$@"
 }
@@ -130,6 +146,13 @@ cmd_install() {
 
 cmd_boot() {
   [[ -f $DISK ]] || { echo "no VM disk — run bin/vm install first" >&2; exit 1; }
+  if [[ ${1:-} == "--gui" ]]; then
+    GUI=1
+    # There is no virgl on this host, so the guest renders with llvmpipe on
+    # the CPU. Give it room, and more cores than the headless default needs.
+    MEM=${AERIS_VM_MEM:-8192}
+    echo "graphical mode: log in on the QEMU window (tty1), not this serial console"
+  fi
   qemu
 }
 
@@ -162,7 +185,7 @@ cmd_snapshot() {
 
 case ${1:-} in
   install)    shift; cmd_install "$@" ;;
-  boot)       cmd_boot ;;
+  boot)       shift; cmd_boot "$@" ;;
   sync)       cmd_sync ;;
   ssh)        shift; ssh_vm "$@" ;;
   save|reset) cmd_snapshot "$1" ;;
