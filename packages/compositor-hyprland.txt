@@ -1,7 +1,17 @@
-# Hyprland. NOT in Fedora's official repos for any release, so this needs a
-# COPR — see setup.d/10-repos.sh and set AERIS_HYPRLAND_COPR.
+# Hyprland. NOT in Fedora's official repos for any release, so it comes from
+# a COPR — see setup.d/10-repos.sh, default lionheartp/Hyprland.
 #
-# Coverage is uneven and the COPRs are personal repos. Before relying on one:
+# Why that one: it is what ML4W (github.com/mylinuxforwork/dotfiles, ~5k
+# stars, actively maintained) ships for Fedora, so a large user base exercises
+# it continuously. That is the best availability signal a personal COPR gives
+# you. It covers f44/f45/rawhide on both aarch64 and x86_64.
+#
+# Alternates with equal or wider coverage, also both arches:
+#   mineiro/hyprland   f43 f44 f45 rawhide   (no quickshell)
+#   sdegler/hyprland   f43 f44 f45 rawhide
+# Avoid solopasha/hyprland: rawhide/x86_64 only despite being widely cited.
+#
+# Check any of them before depending on it:
 #   curl -s "https://copr.fedorainfracloud.org/api_3/project?ownername=OWNER&projectname=PROJ" \
 #     | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin)["chroot_repos"]))'
 hyprland

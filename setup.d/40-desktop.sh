@@ -2,11 +2,11 @@
 # Shared Wayland stack plus one compositor. Started from a TTY — no display
 # manager, deliberately: one less moving part while the base settles.
 #
-#   AERIS_COMPOSITOR=sway      (default) in Fedora proper, every arch
-#   AERIS_COMPOSITOR=hyprland  needs a COPR; see packages/compositor-hyprland.txt
+#   AERIS_COMPOSITOR=hyprland  (default) from a COPR, both arches
+#   AERIS_COMPOSITOR=sway      from Fedora proper, if you want no COPR at all
 set -euo pipefail
 
-compositor=${AERIS_COMPOSITOR:-sway}
+compositor=${AERIS_COMPOSITOR:-hyprland}
 list="$AERIS_ROOT/packages/compositor-$compositor.txt"
 [[ -f $list ]] || { echo "no package list for compositor '$compositor'" >&2; exit 1; }
 

@@ -136,35 +136,39 @@ dnf repoquery --userinstalled --qf '%{name}' | sort > packages/installed.txt
 Phases 1 and 2 have nothing to do with the desktop, and they are the ones that
 can waste a weekend. Do them first, boringly.
 
-## The compositor is a choice
+## The compositor comes from a COPR
 
-Hyprland is **not in Fedora's official repos** for any release. The canonical
-COPR (`solopasha/hyprland`) currently builds rawhide/x86_64 only, and the
-COPRs that do cover other releases and aarch64 are small personal repos.
+Hyprland is **not in Fedora's official repos** for any release. It comes from
+a COPR, and the choice of which matters more than it should:
 
-| | Sway (default) | Hyprland |
-| --- | --- | --- |
-| Source | Fedora official repos | a personal COPR |
-| Architectures | all | depends on the COPR |
-| Config needed | none, ships a working one | `dotfiles/hypr/hyprland.conf` |
+| COPR | Releases | Arches | |
+| --- | --- | --- | --- |
+| `lionheartp/Hyprland` | 44, 45, rawhide | aarch64, x86_64 | default — what ML4W ships |
+| `mineiro/hyprland` | 43, 44, 45, rawhide | aarch64, x86_64 | widest; no quickshell |
+| `sdegler/hyprland` | 43, 44, 45, rawhide | aarch64, x86_64 | |
+| `solopasha/hyprland` | rawhide only | x86_64 | widely cited, least maintained |
+
+The default is the one [ML4W](https://github.com/mylinuxforwork/dotfiles)
+ships for Fedora — a large, actively maintained dotfiles project, so its user
+base exercises that COPR continuously. For a personal repo that is the best
+availability signal there is.
 
 ```
-sudo ./setup 40                                   # sway
-AERIS_COMPOSITOR=hyprland \
-  AERIS_HYPRLAND_COPR=owner/project \
-  sudo -E ./setup 10 40                           # hyprland
+sudo ./setup 10 40                                        # hyprland, default COPR
+AERIS_HYPRLAND_COPR=mineiro/hyprland sudo -E ./setup 10 40
+AERIS_COMPOSITOR=sway sudo -E ./setup 40                  # no COPR at all
 ```
 
-Check a COPR's coverage before depending on it:
+Check coverage before depending on any of them:
 
 ```
 curl -s "https://copr.fedorainfracloud.org/api_3/project?ownername=OWNER&projectname=PROJ" \
   | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin)["chroot_repos"]))'
 ```
 
-Use Sway in the VM regardless of what you want on the real machine: the VM's
-job is to prove the graphics path works — virtio-gpu, DRM, llvmpipe, the
-logind session — and none of that is compositor-specific.
+Sway stays available as a fallback: it is in Fedora proper for every arch and
+ships a working config, which makes it useful for isolating whether a problem
+is the graphics path or Hyprland itself.
 
 ## Dev VM vs target machine
 
